@@ -1,3 +1,10 @@
+# Directories
+Debug/
+
+# VS2015
+*.db
+*.opendb
+
 # Prerequisites
 *.d
 
@@ -15,6 +22,7 @@
 *.so
 *.dylib
 *.dll
+*.mll
 
 # Fortran module files
 *.mod
