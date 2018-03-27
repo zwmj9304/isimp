@@ -20,17 +20,23 @@
     <ClCompile Include="isimpFtyAction.cpp" />
     <ClCompile Include="isimpMain.cpp" />
     <ClCompile Include="isimpNode.cpp" />
-    <ClCompile Include="isimpNode.h" />
     <ClCompile Include="polyModifierCmd.cpp" />
     <ClCompile Include="polyModifierFty.cpp" />
     <ClCompile Include="polyModifierNode.cpp" />
+    <ClCompile Include="vsa.cpp" />
+    <ClCompile Include="vsaFace.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="isimpCmd.h" />
     <ClInclude Include="isimpFty.h" />
+    <ClInclude Include="isimpNode.h" />
     <ClInclude Include="polyModifierCmd.h" />
     <ClInclude Include="polyModifierFty.h" />
     <ClInclude Include="polyModifierNode.h" />
+    <ClInclude Include="vsa.h" />
+    <ClInclude Include="vsaFace.h" />
+    <ClInclude Include="vsaProxy.h" />
+    <ClInclude Include="vsaTypes.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <Keyword>Win32Proj</Keyword>

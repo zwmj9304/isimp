@@ -33,6 +33,9 @@
 #include <maya/MIntArray.h>
 #include <maya/MString.h>
 
+// Project Specific Includes
+//
+#include "vsa.h"
 
 enum MeshOperation
 {
@@ -60,6 +63,7 @@ public:
 	void		setComponentList(MObject& componentList);
 	void		setComponentIDs(MIntArray& componentIDs);
 	void		setMeshOperation(MeshOperation operationType);
+	void		setVSAParams(int numProxies, int numIterations);
 
 	// Returns the type of component expected by a given mesh operation
 	//
@@ -84,12 +88,24 @@ private:
 	MeshOperation	fOperationType;
 	MObject			fComponentList;
 
-	MStatus doFlooding(MFnMesh& meshFn);
-	MStatus doReFlooding(MFnMesh& meshFn);
-	MStatus doMeshing(MFnMesh& meshFn);
-	MStatus doAddProxy(MFnMesh& meshFn);
-	MStatus doDelProxy(MFnMesh& meshFn);
-	MStatus doPaintProxy(MFnMesh& meshFn);
+	MStatus doFlooding();
+	MStatus doReFlooding();
+	MStatus doMeshing();
+	MStatus doAddProxy();
+	MStatus doDelProxy();
+	MStatus doPaintProxy();
+
+	GenericArray<VSAFace>	faceList;
+	GenericArray<Proxy>		proxyList;
+
+	// VSA Specific parameters
+	//
+	int	fNumProxies;			///< The number of proxies
+	int	fNumIterations;			///< The maximum number of iterations
+	double	edgeSplitThreshold;
+
+	MStatus buildFaceNeighbors();
+	MStatus getFloodingResult();
 };
 
 #endif

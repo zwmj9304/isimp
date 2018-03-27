@@ -53,6 +53,7 @@
 #include "isimpNode.h"
 
 #include <maya/MFnPlugin.h>
+#include <maya/MStreamUtils.h>
 
 MStatus initializePlugin(MObject obj)
 //
@@ -82,6 +83,9 @@ MStatus initializePlugin(MObject obj)
 		status.perror("registerNode");
 		return status;
 	}
+
+	cout.rdbuf(MStreamUtils::stdOutStream().rdbuf());
+	cerr.rdbuf(MStreamUtils::stdErrorStream().rdbuf());
 
 	return status;
 }

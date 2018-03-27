@@ -38,9 +38,6 @@
     <ClCompile Include="isimpCmd.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="isimpNode.h">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="isimpFty.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -48,6 +45,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="isimpNode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vsa.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vsaFace.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -65,6 +68,21 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="isimpFty.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vsaTypes.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vsaFace.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vsaProxy.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vsa.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="isimpNode.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

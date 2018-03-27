@@ -63,6 +63,15 @@ void isimpFty::setMeshOperation(MeshOperation operationType)
 	fOperationType = operationType;
 }
 
+void isimpFty::setVSAParams(int numProxies, int numIterations)
+{
+	//	Description:
+	//		Sets VSA specific parameters
+	//
+	fNumIterations = numIterations;
+	fNumProxies = numProxies;
+}
+
 MFn::Type isimpFty::getExpectedComponentType(MeshOperation operationType)
 {
 	switch (operationType) 

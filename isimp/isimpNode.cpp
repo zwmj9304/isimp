@@ -17,6 +17,8 @@
 #include <maya/MFnComponentListData.h>
 #include <maya/MFnSingleIndexedComponent.h>
 #include <maya/MFnEnumAttribute.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MFnNumericData.h>
 
 // General Includes
 //
@@ -43,6 +45,9 @@ MTypeId     isimpNode::id( 0x15206 );
 //
 MObject     isimpNode::cpList;
 MObject     isimpNode::opType;
+MObject		isimpNode::nProxies;
+MObject		isimpNode::nIter;
+
 
 isimpNode::isimpNode()
 {}
@@ -110,6 +115,12 @@ MStatus isimpNode::compute(const MPlug& plug, MDataBlock& data)
 			MDataHandle opTypeData = data.inputValue(opType, &status);
 			MCheckStatus(status, "ERROR getting opType");
 
+			MDataHandle nProxData = data.inputValue(nProxies, &status);
+			MCheckStatus(status, "ERROR getting nProxies");
+
+			MDataHandle nIterData = data.inputValue(nIter, &status);
+			MCheckStatus(status, "ERROR getting nIter");
+
 			// Copy the inMesh to the outMesh, so you can
 			// perform operations directly on outMesh
 			//
@@ -146,13 +157,16 @@ MStatus isimpNode::compute(const MPlug& plug, MDataBlock& data)
 				}
 			}
 
+			Size numProxies = nProxData.asInt();
+			Size numIterations = nIterData.asInt();
+
 			// Set the mesh object and component List on the factory
 			//
 			fmeshOpFactory.setMesh(mesh);
 			fmeshOpFactory.setComponentList(compList);
 			fmeshOpFactory.setComponentIDs(cpIds);
 			fmeshOpFactory.setMeshOperation(operationType);
-
+			fmeshOpFactory.setVSAParams(numProxies, numIterations);
 			// Now, perform the meshOp
 			//
 			status = fmeshOpFactory.doIt();
@@ -199,6 +213,8 @@ MStatus isimpNode::initialize()
 
 	MFnTypedAttribute attrFn;
 	MFnEnumAttribute enumFn;
+	MFnNumericAttribute numIterFn;
+	MFnNumericAttribute numProxyFn;
 
 	cpList = attrFn.create("inputComponents", "ics",
 		MFnComponentListData::kComponentList);
@@ -213,11 +229,17 @@ MStatus isimpNode::initialize()
 	inMesh = attrFn.create("inMesh", "im", MFnMeshData::kMesh);
 	attrFn.setStorable(true);	// To be stored during file-save
 
-								// Attribute is read-only because it is an output attribute
-								//
+	// Attribute is read-only because it is an output attribute
+	//
 	outMesh = attrFn.create("outMesh", "om", MFnMeshData::kMesh);
 	attrFn.setStorable(false);
 	attrFn.setWritable(false);
+
+	nProxies = numProxyFn.create("nProxies", "npx", MFnNumericData::kInt, 10);
+	numProxyFn.setStorable(true);	// To be stored during file-save
+
+	nIter = numIterFn.create("nIter", "nit", MFnNumericData::kInt, 10);
+	numIterFn.setStorable(true);	// To be stored during file-save
 
 	// Add the attributes we have created to the node
 	//
@@ -228,6 +250,18 @@ MStatus isimpNode::initialize()
 		return status;
 	}
 	status = addAttribute(opType);
+	if (!status)
+	{
+		status.perror("addAttribute");
+		return status;
+	}
+	status = addAttribute(nProxies);
+	if (!status)
+	{
+		status.perror("addAttribute");
+		return status;
+	}
+	status = addAttribute(nIter);
 	if (!status)
 	{
 		status.perror("addAttribute");
@@ -265,6 +299,20 @@ MStatus isimpNode::initialize()
 	}
 
 	status = attributeAffects(opType, outMesh);
+	if (!status)
+	{
+		status.perror("attributeAffects");
+		return status;
+	}
+
+	status = attributeAffects(nProxies, outMesh);
+	if (!status)
+	{
+		status.perror("attributeAffects");
+		return status;
+	}
+
+	status = attributeAffects(nIter, outMesh);
 	if (!status)
 	{
 		status.perror("attributeAffects");

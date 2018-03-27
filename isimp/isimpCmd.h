@@ -92,4 +92,5 @@ private:
 	// internal Routines
 	bool		checkInvalidInput(const MArgList& argList);
 };
+
 #endif
