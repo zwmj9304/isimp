@@ -221,9 +221,10 @@ MStatus isimpNode::initialize()
 	attrFn.setStorable(true);	// To be stored during file-save
 
 	opType = enumFn.create("operationType", "oprt", 0, &status);
-	enumFn.addField("flood", 0);
+	enumFn.addField("flooding", 0);
 	enumFn.addField("meshing", 1);
 	enumFn.setHidden(false);
+	enumFn.setWritable(false);
 	enumFn.setStorable(true);	// To be stored during file-save
 
 	inMesh = attrFn.create("inMesh", "im", MFnMeshData::kMesh);

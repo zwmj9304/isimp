@@ -37,6 +37,11 @@
 //
 #include "vsa.h"
 
+#define LABEL_BLIND_DATA_ID 15206
+#define LABEL_BL_LONG_NAME "proxy_label"
+#define LABEL_BL_SHORT_NAME "pxl"
+
+
 enum MeshOperation
 {
 	kFlood = 0,
@@ -106,6 +111,7 @@ private:
 
 	MStatus buildFaceNeighbors();
 	MStatus getFloodingResult();
+	MStatus checkOrCreateBlindDataType();
 };
 
 #endif
