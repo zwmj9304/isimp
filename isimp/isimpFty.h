@@ -36,11 +36,7 @@
 // Project Specific Includes
 //
 #include "vsa.h"
-
-#define LABEL_BLIND_DATA_ID 15206
-#define LABEL_BL_LONG_NAME "proxy_label"
-#define LABEL_BL_SHORT_NAME "pxl"
-
+#include "vsaMesher.h"
 
 enum MeshOperation
 {
@@ -68,7 +64,7 @@ public:
 	void		setComponentList(MObject& componentList);
 	void		setComponentIDs(MIntArray& componentIDs);
 	void		setMeshOperation(MeshOperation operationType);
-	void		setVSAParams(int numProxies, int numIterations);
+	void		setVSAParams(int numProxies, int numIterations, double edgeSplitThres);
 
 	// Returns the type of component expected by a given mesh operation
 	//
@@ -100,18 +96,19 @@ private:
 	MStatus doDelProxy();
 	MStatus doPaintProxy();
 
-	GenericArray<VSAFace>	faceList;
-	GenericArray<Proxy>		proxyList;
+	Array<VSAFace>	faceList;
+	Array<Proxy>	proxyList;
 
 	// VSA Specific parameters
 	//
 	int	fNumProxies;			///< The number of proxies
 	int	fNumIterations;			///< The maximum number of iterations
-	double	edgeSplitThreshold;
+	double	edgeSplitThreshold; ///< Edge split threshold used in meshing
 
 	MStatus buildFaceNeighbors();
 	MStatus getFloodingResult();
 	MStatus checkOrCreateBlindDataType();
+	MStatus rebuildProxyList();
 };
 
 #endif

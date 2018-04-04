@@ -50,6 +50,7 @@ MStatus VSAFace::build(VSAFace &face, MItMeshPolygon &faceIter, FaceIndex idx)
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 	status = faceIter.getNormal(face.normal);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
+	face.normal.normalize();
 	face.centroid = faceIter.center(MSpace::kObject, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 

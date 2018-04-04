@@ -47,6 +47,7 @@ MObject     isimpNode::cpList;
 MObject     isimpNode::opType;
 MObject		isimpNode::nProxies;
 MObject		isimpNode::nIter;
+MObject		isimpNode::eThres;
 
 
 isimpNode::isimpNode()
@@ -121,6 +122,9 @@ MStatus isimpNode::compute(const MPlug& plug, MDataBlock& data)
 			MDataHandle nIterData = data.inputValue(nIter, &status);
 			MCheckStatus(status, "ERROR getting nIter");
 
+			MDataHandle eThresData = data.inputValue(eThres, &status);
+			MCheckStatus(status, "ERROR getting eThres");
+
 			// Copy the inMesh to the outMesh, so you can
 			// perform operations directly on outMesh
 			//
@@ -159,6 +163,7 @@ MStatus isimpNode::compute(const MPlug& plug, MDataBlock& data)
 
 			Size numProxies = nProxData.asInt();
 			Size numIterations = nIterData.asInt();
+			double edgeSplitThreshold = eThresData.asDouble();
 
 			// Set the mesh object and component List on the factory
 			//
@@ -166,7 +171,7 @@ MStatus isimpNode::compute(const MPlug& plug, MDataBlock& data)
 			fmeshOpFactory.setComponentList(compList);
 			fmeshOpFactory.setComponentIDs(cpIds);
 			fmeshOpFactory.setMeshOperation(operationType);
-			fmeshOpFactory.setVSAParams(numProxies, numIterations);
+			fmeshOpFactory.setVSAParams(numProxies, numIterations, edgeSplitThreshold);
 			// Now, perform the meshOp
 			//
 			status = fmeshOpFactory.doIt();
@@ -215,6 +220,7 @@ MStatus isimpNode::initialize()
 	MFnEnumAttribute enumFn;
 	MFnNumericAttribute numIterFn;
 	MFnNumericAttribute numProxyFn;
+	MFnNumericAttribute eThresFn;
 
 	cpList = attrFn.create("inputComponents", "ics",
 		MFnComponentListData::kComponentList);
@@ -236,11 +242,14 @@ MStatus isimpNode::initialize()
 	attrFn.setStorable(false);
 	attrFn.setWritable(false);
 
-	nProxies = numProxyFn.create("nProxies", "npx", MFnNumericData::kInt, 10);
+	nProxies = numProxyFn.create("nProxies", "npx", MFnNumericData::kInt, 6);
 	numProxyFn.setStorable(true);	// To be stored during file-save
 
 	nIter = numIterFn.create("nIter", "nit", MFnNumericData::kInt, 10);
 	numIterFn.setStorable(true);	// To be stored during file-save
+
+	eThres = eThresFn.create("eThres", "eth", MFnNumericData::kDouble, 1.0);
+	eThresFn.setStorable(true);	// To be stored during file-save
 
 	// Add the attributes we have created to the node
 	//
@@ -263,6 +272,12 @@ MStatus isimpNode::initialize()
 		return status;
 	}
 	status = addAttribute(nIter);
+	if (!status)
+	{
+		status.perror("addAttribute");
+		return status;
+	}
+	status = addAttribute(eThres);
 	if (!status)
 	{
 		status.perror("addAttribute");
@@ -314,6 +329,13 @@ MStatus isimpNode::initialize()
 	}
 
 	status = attributeAffects(nIter, outMesh);
+	if (!status)
+	{
+		status.perror("attributeAffects");
+		return status;
+	}
+
+	status = attributeAffects(eThres, outMesh);
 	if (!status)
 	{
 		status.perror("attributeAffects");

@@ -116,16 +116,16 @@ MStatus isimpFty::doFlooding() {
 	// Run Distortion Minimizing Flooding on given mesh using attributes
 	// such as numProxies, numIterations, etc.
 	//
-	VSA::init(faceList, proxyList, fNumProxies);
+	VSAFlooding::init(faceList, proxyList, fNumProxies);
 	for (int i = 1; i < fNumIterations; i++)
 	{
 		timer.beginTimer();
-		VSA::fitProxy(faceList, proxyList);
+		VSAFlooding::fitProxy(faceList, proxyList);
 		timer.endTimer();
 		cout << "Fit Proxy Time " << timer.elapsedTime() << endl;
 
 		timer.beginTimer();
-		VSA::flood(faceList, proxyList);
+		VSAFlooding::flood(faceList, proxyList);
 		timer.endTimer();
 		cout << "Flooding Time " << timer.elapsedTime() << endl;
 	}
@@ -149,51 +149,35 @@ MStatus isimpFty::doMeshing()
 	MStatus status;
 	MFnMesh meshFn(fMesh);
 
-	if (false == meshFn.hasBlindData(MFn::kMeshPolygonComponent,
-		LABEL_BLIND_DATA_ID, &status))
-	{
-		ErrorReturn("ERROR getting flooding information");
-	}
+	// First, get proxy information from input mesh
+	status = rebuildProxyList();
+	CHECK_MSTATUS_AND_RETURN_IT(status);
+
+	VSAMesher mesher(fMesh);
+	// First run VSA routines to find anchor vertices
+	status = mesher.initAnchors(proxyList);
+	CHECK_MSTATUS_AND_RETURN_IT(status);
+	status = mesher.refineAnchors(proxyList, edgeSplitThreshold);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
 	// Create the new mesh
-	int cube_cnts[6] = {
-		4,4,4,4,4,4
-	};
-	int cube_gons[24] = {
-		0,3,2,1,
-		7,4,5,6,
-		2,6,5,1,
-		0,4,7,3,
-		2,3,7,6,
-		1,5,4,0
-	};
-	
-	int numVertices = 8, numPolygons = 6;
-
+	int numVertices, numPolygons;
 	MFloatPointArray	newVertices;
-
-	float a = 1.f;
-	newVertices.append(a, a, a); newVertices.append(a, -a, a); 
-	newVertices.append(-a, -a, a); newVertices.append(-a, a, a);
-	newVertices.append(a, a, -a); newVertices.append(a, -a, -a); 
-	newVertices.append(-a, -a, -a); newVertices.append(-a, a, -a);
-
-	MIntArray 	polygonCounts(cube_cnts, 6);
-	MIntArray 	polygonConnects(cube_gons, 24);
-
-	MStatusAssert(newVertices.length() == 8, "vertices length error");
-	MStatusAssert(polygonCounts.length() == 6, "polygonCounts length error");
-	MStatusAssert(polygonConnects.length() == 24, "polygonCounts length error");
-
+	MIntArray 	polygonCounts;
+	MIntArray 	polygonConnects;
+	
+	// This maps old vertex indices to new indices
+	Map<VertexIndex, VertexIndex> newIndices;
+	status = mesher.buildNewVerticesList(proxyList, newIndices, newVertices, numVertices);
+	CHECK_MSTATUS_AND_RETURN_IT(status);
+	status = mesher.buildNewFacesList(proxyList, newIndices, polygonCounts, polygonConnects, numPolygons);
+	CHECK_MSTATUS_AND_RETURN_IT(status);
 	// Note:
 	// If the functionset is operating on a mesh node with construction history, 
 	// this method will fail as the node will continue to get its geometry from 
 	// its history connection.
 	// To use this method you must first break the history connection.
-
 	status = meshFn.createInPlace(numVertices, numPolygons, newVertices, polygonCounts, polygonConnects);
-
 	return status;
 }
 
@@ -241,8 +225,14 @@ MStatus isimpFty::getFloodingResult()
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 
 		// Assign proxy label to faces too, using BlindData
+		ProxyLabel label = faceList[i].label;
 		status = meshFn.setIntBlindData(i, MFn::kMeshPolygonComponent, 
-			LABEL_BLIND_DATA_ID, LABEL_BL_SHORT_NAME, faceList[i].label);
+			PROXY_BLIND_DATA_ID, LABEL_BL_SHORT_NAME, label);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+
+		bool isSeed = label < 0 ? false : (proxyList[label].seed == i);
+		status = meshFn.setBoolBlindData(i, MFn::kMeshPolygonComponent,
+			PROXY_BLIND_DATA_ID, SEED_BL_SHORT_NAME, isSeed);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 	}
 	return MS::kSuccess;
@@ -256,16 +246,85 @@ MStatus isimpFty::checkOrCreateBlindDataType()
 	MStatus status;
 	MFnMesh meshFn(fMesh);
 
-	if (false == meshFn.isBlindDataTypeUsed(LABEL_BLIND_DATA_ID, &status))
+	if (false == meshFn.isBlindDataTypeUsed(PROXY_BLIND_DATA_ID, &status))
 	{
 		MStringArray longNames, shortNames, formatNames;
 
 		longNames.append(LABEL_BL_LONG_NAME);
 		shortNames.append(LABEL_BL_SHORT_NAME);
 		formatNames.append("int");
+
+		longNames.append(SEED_BL_LONG_NAME);
+		shortNames.append(SEED_BL_SHORT_NAME);
+		formatNames.append("boolean");
 		status = meshFn.createBlindDataType(
-			LABEL_BLIND_DATA_ID, longNames, shortNames, formatNames);
+			PROXY_BLIND_DATA_ID, longNames, shortNames, formatNames);
 		MCheckStatus(status, "ERROR creating blind data type");
 	}
+	return status;
+}
+
+MStatus isimpFty::rebuildProxyList()
+{
+	MStatus status;
+	MFnMesh meshFn(fMesh);
+	MItMeshPolygon faceIter(fMesh);
+
+	if (false == meshFn.hasBlindData(MFn::kMeshPolygonComponent,
+		PROXY_BLIND_DATA_ID, &status))
+	{
+		ErrorReturn("ERROR getting proxy information from mesh");
+	}
+	CHECK_MSTATUS_AND_RETURN_IT(status);
+
+	int highestLabel = 0;
+	int numFaces = meshFn.numPolygons();
+
+	// Build a map to record all seed faces
+	//
+	Map<ProxyLabel, FaceIndex> labelMap;
+	for (FaceIndex i = 0; i < numFaces; i++)
+	{
+		ProxyLabel label;
+		bool isSeed;
+		status = meshFn.getIntBlindData(i, MFn::kMeshPolygonComponent, 
+			PROXY_BLIND_DATA_ID, LABEL_BL_SHORT_NAME, label);
+		MCheckStatus(status, "ERROR getting proxy information from mesh");
+		highestLabel = label > highestLabel ? label : highestLabel;
+
+		status = meshFn.getBoolBlindData(i, MFn::kMeshPolygonComponent,
+			PROXY_BLIND_DATA_ID, SEED_BL_SHORT_NAME, isSeed);
+		if (isSeed && label >= 0)
+		{
+			labelMap.insert(newEntry(label, i));
+		}
+	}
+
+	if (labelMap.size() == 0)
+	{
+		ErrorReturn("ERROR proxy information not initialized");
+	}
+
+	fNumProxies = highestLabel + 1;
+	for (ProxyLabel l = 0; l < fNumProxies; l++)
+	{
+		Proxy newProxy(l);
+		auto labelEntry = labelMap.find(l);
+		if (labelEntry != labelMap.end())
+		{
+			FaceIndex seedFace = labelEntry->second;
+			FaceIndex prev;
+			faceIter.setIndex(seedFace, prev);
+			newProxy.seed = labelEntry->second;
+			newProxy.centroid = faceIter.center();
+			faceIter.getNormal(newProxy.normal);
+		}
+		else
+		{
+			newProxy.valid = false;
+		}
+		proxyList.push_back(newProxy);
+	}
+
 	return status;
 }

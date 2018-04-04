@@ -53,6 +53,12 @@
     <ClCompile Include="vsaFace.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="vsaProxy.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vsaMesher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="isimpCmd.h">
@@ -83,6 +89,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="isimpNode.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vsaMesher.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

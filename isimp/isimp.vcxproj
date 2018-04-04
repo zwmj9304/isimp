@@ -25,6 +25,8 @@
     <ClCompile Include="polyModifierNode.cpp" />
     <ClCompile Include="vsa.cpp" />
     <ClCompile Include="vsaFace.cpp" />
+    <ClCompile Include="vsaMesher.cpp" />
+    <ClCompile Include="vsaProxy.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="isimpCmd.h" />
@@ -35,6 +37,7 @@
     <ClInclude Include="polyModifierNode.h" />
     <ClInclude Include="vsa.h" />
     <ClInclude Include="vsaFace.h" />
+    <ClInclude Include="vsaMesher.h" />
     <ClInclude Include="vsaProxy.h" />
     <ClInclude Include="vsaTypes.h" />
   </ItemGroup>

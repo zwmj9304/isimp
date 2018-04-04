@@ -11,7 +11,7 @@
 
 #include "vsa.h"
 
-void VSA::init(GenericArray<VSAFace> &faceList, GenericArray<Proxy> &proxyList, 
+void VSAFlooding::init(Array<VSAFace> &faceList, Array<Proxy> &proxyList, 
 	Size numProxies)
 {
 	proxyList.clear();
@@ -22,6 +22,7 @@ void VSA::init(GenericArray<VSAFace> &faceList, GenericArray<Proxy> &proxyList,
 	for (FaceIndex f = 0; f < numFaces && proxyLabel < numProxies; f += offset)
 	{
 		faceList[f].label = proxyLabel;
+		proxyList[proxyLabel].label		= proxyLabel;
 		proxyList[proxyLabel].seed		= f;
 		proxyList[proxyLabel].centroid	= faceList[f].centroid;
 		proxyList[proxyLabel].normal	= faceList[f].normal;
@@ -30,7 +31,7 @@ void VSA::init(GenericArray<VSAFace> &faceList, GenericArray<Proxy> &proxyList,
 	}
 }
 
-void VSA::flood(GenericArray<VSAFace> &faceList, GenericArray<Proxy> &proxyList)
+void VSAFlooding::flood(Array<VSAFace> &faceList, Array<Proxy> &proxyList)
 {
 	// Global priority queue of faces
 	auto metricComp = [](MetricFace mf1, MetricFace mf2) {
@@ -80,20 +81,20 @@ void VSA::flood(GenericArray<VSAFace> &faceList, GenericArray<Proxy> &proxyList)
 	}
 }
 
-double VSA::calcDistortionError(const VSAFace &face, const Proxy &proxy)
+double VSAFlooding::calcDistortionError(const VSAFace &face, const Proxy &proxy)
 {
 	return face.area * (face.normal - proxy.normal).length();
 }
 
-void VSA::fitProxy(GenericArray<VSAFace> &faceList, GenericArray<Proxy> &proxyList)
+void VSAFlooding::fitProxy(Array<VSAFace> &faceList, Array<Proxy> &proxyList)
 {
 	Size numProxies = (Size) proxyList.size();
-	GenericArray<double> totalArea(numProxies);
-	GenericArray<double> totalDistortionError(numProxies);
-	GenericArray<double> lowestNormalDiff(numProxies);
+	Array<double> totalArea(numProxies);
+	Array<double> totalDistortionError(numProxies);
+	Array<double> lowestNormalDiff(numProxies);
 
-	GenericArray<Vector3D> areaWeightedNormal(numProxies);
-	GenericArray<Point3D> areaWeightedCentroid(numProxies);
+	Array<Vector3D> areaWeightedNormal(numProxies);
+	Array<Point3D> areaWeightedCentroid(numProxies);
 	// add up related values per proxy
 	for (auto &f : faceList)
 	{
@@ -109,8 +110,6 @@ void VSA::fitProxy(GenericArray<VSAFace> &faceList, GenericArray<Proxy> &proxyLi
 	for (ProxyLabel label = 0; label < numProxies; label++) 
 	{
 		if (!proxyList[label].valid) continue;
-		proxyList[label].totalDistorsion = totalDistortionError[label];
-		proxyList[label].totalArea = totalArea[label];
 		proxyList[label].normal = areaWeightedNormal[label] / totalArea[label];
 		proxyList[label].centroid = areaWeightedCentroid[label] / totalArea[label];
 		// initialize with double max value
@@ -134,7 +133,7 @@ void VSA::fitProxy(GenericArray<VSAFace> &faceList, GenericArray<Proxy> &proxyLi
 	}
 }
 
-void VSA::clear(GenericArray<VSAFace> &faceList)
+void VSAFlooding::clear(Array<VSAFace> &faceList)
 {
 	for (auto &f : faceList)
 	{

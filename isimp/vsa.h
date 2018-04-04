@@ -30,15 +30,15 @@ typedef struct MetricFace {
 } MetricFace;
 
 
-class VSA {
+class VSAFlooding 
+{
 public:
-	static void init(GenericArray<VSAFace> &faceList, GenericArray<Proxy> &proxyList, Size numProxies);
-	static void flood(GenericArray<VSAFace> &faceList, GenericArray<Proxy> &proxyList);
-	static void fitProxy(GenericArray<VSAFace> &faceList, GenericArray<Proxy> &proxyList);
-	static void clear(GenericArray<VSAFace> &faceList);
+	static void init(Array<VSAFace> &faceList, Array<Proxy> &proxyList, Size numProxies);
+	static void flood(Array<VSAFace> &faceList, Array<Proxy> &proxyList);
+	static void fitProxy(Array<VSAFace> &faceList, Array<Proxy> &proxyList);
+	static void clear(Array<VSAFace> &faceList);
 
 	static double calcDistortionError(const VSAFace &face, const Proxy &proxy);
 };
-
 
 #endif //MAYA_VSA_H
