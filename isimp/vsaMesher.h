@@ -13,31 +13,45 @@
 
 #include "vsaTypes.h"
 #include "vsaProxy.h"
+#include "vsaFace.h"
+#include <maya/MItMeshEdge.h>
+
 
 class VSAMesher
 {
 public:
-	VSAMesher(MObject &mesh) : meshObj(mesh) {}
+	VSAMesher(MObject &mesh,
+		Array<Proxy> &proxyList,	Array<VSAFace> &faceList,
+		MFnMesh &meshFn,			MItMeshPolygon &faceIt, 
+		MItMeshEdge &edgeIt,		MItMeshVertex &vertexIt) : 
+		meshObj(mesh), proxyList(proxyList), faceList(faceList),
+		context(mesh)
+	{}
 
-	MStatus initAnchors(Array<Proxy> &proxyList);
-	MStatus refineAnchors(Array<Proxy> &proxyList, double threshold = 2.0);
+	MStatus initAnchors();
+	MStatus refineAnchors(double threshold = 2.0);
 
-	MStatus buildNewVerticesList(Array<Proxy> &proxyList, 
-								 Map<VertexIndex, VertexIndex> &newIndices, 
+	MStatus buildNewVerticesList(Map<VertexIndex, VertexIndex> &newIndices, 
 								 MFloatPointArray &newVertices,
 								 int &numVertices);
-	MStatus buildNewFacesList(Array<Proxy> &proxyList,
-							  Map<VertexIndex, VertexIndex> &newIndices,
+	MStatus buildNewFacesList(Map<VertexIndex, VertexIndex> &newIndices,
 							  MIntArray &polygonCounts, 
 							  MIntArray &polygonConnects,
 							  int &numPolygons);
 
+	static int m_counter[10];
+	static double m_time[10];
+
 private:
 	MObject &meshObj;
+	MeshingContext context;
+	Array<Proxy>	&proxyList;
+	Array<VSAFace>	&faceList;
+
 	Map<VertexIndex, Array<ProxyLabel>> anchorVertices;
 
-	void newAnchor(Array<Proxy> &proxyList, VertexIndex vertex);
-	VertexIndex splitEdge(Array<Proxy> &proxyList, Proxy &proxy, 
+	void newAnchor(VertexIndex vertex);
+	VertexIndex splitEdge(Proxy &proxy, 
 		VertexIndex v1, VertexIndex v2, double threshold);
 
 	// cross product

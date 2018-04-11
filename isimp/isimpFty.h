@@ -42,10 +42,10 @@ enum MeshOperation
 {
 	kFlood = 0,
 	kGenerate = 1,
-	kRefresh = 2,
-	kAddProxyBySeed = 3,
-	kDeleteProxyBySeed = 4,
-	kPaintProxyByFace = 5,
+	kAddProxyBySeed = 2,
+	kDeleteProxyBySeed = 3,
+	kPaintProxyByFace = 4,
+	kRefresh = 5,
 
 	// Number of valid operations
 	kMeshOperationCount = 6
@@ -90,11 +90,11 @@ private:
 	MObject			fComponentList;
 
 	MStatus doFlooding();
-	MStatus doReFlooding();
 	MStatus doMeshing();
 	MStatus doAddProxy();
 	MStatus doDelProxy();
 	MStatus doPaintProxy();
+	MStatus doReFlooding();
 
 	Array<VSAFace>	faceList;
 	Array<Proxy>	proxyList;
@@ -108,7 +108,7 @@ private:
 	MStatus buildFaceNeighbors();
 	MStatus getFloodingResult();
 	MStatus checkOrCreateBlindDataType();
-	MStatus rebuildProxyList();
+	MStatus rebuildLists();
 };
 
 #endif

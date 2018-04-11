@@ -129,7 +129,7 @@ void VSAFlooding::fitProxy(Array<VSAFace> &faceList, Array<Proxy> &proxyList)
 			lowestNormalDiff[label] = normalDiff;
 		}
 		// clear face label
-		f.label = -1;
+		//f.label = -1;
 	}
 }
 

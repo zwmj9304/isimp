@@ -16,6 +16,12 @@ VSAFace::VSAFace()
 	isBoundary = false;
 }
 
+VSAFace::VSAFace(ProxyLabel label)
+{
+	this->label = label;
+	this->isBoundary = false;
+}
+
 MStatus VSAFace::build(VSAFace &face, MItMeshPolygon &faceIter, FaceIndex idx)
 {
 	MStatus status;
@@ -29,9 +35,9 @@ MStatus VSAFace::build(VSAFace &face, MItMeshPolygon &faceIter, FaceIndex idx)
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 	if (triCount != 1)
 	{
-		// TODO this warning should have a more decent display style
-		cerr << "Face " << idx << " is not triangle, try triangulate first" << endl;
-		return MS::kFailure;
+		std::stringstream ss;
+		ss << "Face " << idx << " is not triangle, try triangulate first";
+		ErrorReturn(ss.str().c_str());
 	}
 
 	// Set neighboring faces

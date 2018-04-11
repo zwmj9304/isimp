@@ -21,6 +21,7 @@
 class VSAFace {
 public:
 	VSAFace();
+	VSAFace(ProxyLabel label);
 	~VSAFace() {}
 
 	static MStatus	build(VSAFace &face, MItMeshPolygon &faceIter, FaceIndex idx);

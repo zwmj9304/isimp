@@ -31,15 +31,6 @@
 
 #include <maya/MIOStream.h>
 
-// Status Checking Macro - MCheckStatus (Debugging tool)
-//
-#define MCheckStatus(status,message)	\
-	if( MS::kSuccess != status ) {		\
-		cerr << message << "\n";		\
-		return status;					\
-	}
-
-
 isimp::isimp()
 {
 	fOperation = (MeshOperation)0;
@@ -329,10 +320,10 @@ bool isimp::checkInvalidInput(const MArgList & argList)
 		cerr << "Valid types are: " << endl;
 		cerr << "   0 - Flood." << endl;
 		cerr << "   1 - Generate Simplified Mesh." << endl;
-		cerr << "   2 - Re-flood." << endl;
-		cerr << "   3 - Add a Region." << endl;
-		cerr << "   4 - Delete a Region." << endl;
-		cerr << "   5 - Paint a New Region." << endl;
+		cerr << "   2 - Add a Region." << endl;
+		cerr << "   3 - Delete a Region." << endl;
+		cerr << "   4 - Paint a New Region." << endl;
+		cerr << "   5 - Re-flood." << endl;
 		displayError(" Expecting one parameter: the operation type.");
 	}
 	return badArgument;

@@ -100,6 +100,7 @@
       <OutputFile>$(Configuration)\isimp.mll</OutputFile>
       <ImportLibrary>$(Configuration)\isimp.lib</ImportLibrary>
       <ProgramDatabaseFile>$(Configuration)\isimp.pdb</ProgramDatabaseFile>
+      <Profile>false</Profile>
     </Link>
     <PostBuildEvent>
       <Command>copy $(Configuration)\isimp.mll ..\plug-ins</Command>

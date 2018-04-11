@@ -28,15 +28,6 @@
 #include <maya/MDataHandle.h>
 #include <maya/MIOStream.h>
 
-// Macros
-//
-#define MCheckStatus(status,message)	\
-	if( MStatus::kSuccess != status ) {	\
-		cerr << message << "\n";		\
-		return status;					\
-	}
-
-
 // Unique Node TypeId
 MTypeId     isimpNode::id( 0x15206 );
 

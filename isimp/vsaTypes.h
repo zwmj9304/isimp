@@ -18,12 +18,20 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <sstream>
+#include <string>  
 #include <list>
 
 // MAYA API Includes
 //
 #include <maya/MVector.h>
 #include <maya/MPoint.h>
+#include <maya/MString.h>
+#include <maya/MGlobal.h>
+#include <maya/MFnMesh.h>
+#include <maya/MItMeshEdge.h>
+#include <maya/MItMeshPolygon.h>
+#include <maya/MItMeshVertex.h>
 
 #define PROXY_BLIND_DATA_ID 15206
 #define LABEL_BL_LONG_NAME "proxy_label"
@@ -47,6 +55,29 @@ typedef int Index;
 
 typedef MPoint Point3D;
 typedef MVector Vector3D;
+
+// Error handling functions
+#define ErrorReturn(message) MGlobal::displayError(MString(message)); return MS::kFailure;
+
+#define MCheckStatus(status,message)											\
+	if ( MS::kSuccess != status ) {												\
+        MGlobal::displayError(MString(message) + ": " + status.errorString());  \
+        return status;															\
+    }
+
+class MeshingContext
+{
+public:
+	MeshingContext(MObject &meshObj) : meshFn(meshObj), faceIter(meshObj),
+		edgeIter(meshObj), vertexIter(meshObj) { }
+	// Function sets, pre-built because building them are very expensive
+	// SHOULD ONLY USE setIndex() for iterators!!!
+	// always setIndex() before use!!!!
+	MFnMesh			meshFn;
+	MItMeshPolygon	faceIter;
+	MItMeshEdge		edgeIter;
+	MItMeshVertex	vertexIter;
+};
 
 
 #endif //MAYA_VSA_TYPES_H

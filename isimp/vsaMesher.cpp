@@ -16,34 +16,35 @@
 #include "maya/MGlobal.h"
 #include "maya/MFloatPointArray.h"
 
-#define ErrorReturn(message) MGlobal::displayError(MString(message)); return MS::kFailure;
-
-MStatus VSAMesher::initAnchors(Array<Proxy>& proxyList)
+MStatus VSAMesher::initAnchors()
 {
 	MStatus status;
-	MItMeshVertex vertexIter(meshObj);
-	MFnMesh meshFn(meshObj);
+	int numVertices = context.meshFn.numVertices();
+	VertexIndex prev;
 
 	// Iterate through all vertices to find border 
 	// halfedges for all proxies
 	//
-	for (; !vertexIter.isDone(); vertexIter.next())
+	for (VertexIndex v = 0; v < numVertices; v++)
 	{
+
 		int proxyCount = 0;
-		VertexIndex v = vertexIter.index();
 		Array<ProxyLabel> labelMapping;
 		// for each vertex, check its neighboring faces
 		MIntArray connectedVertices;
-		status = vertexIter.getConnectedVertices(connectedVertices);
+
+		context.vertexIter.setIndex(v, prev);
+		context.vertexIter.getConnectedVertices(connectedVertices);
+
 		for (int i = 0; i < (int) connectedVertices.length(); i++)
 		{
-			HalfEdge h(meshObj, v, connectedVertices[i]);
+			HalfEdge h(context, v, connectedVertices[i]);
 			if (h.isBoundary()) {
 				proxyCount++;
 				continue;
 			}
-			Proxy &p = proxyList[h.faceLabel()];
-			if (p.isBorder(meshObj, h)) {
+			Proxy &p = proxyList[h.faceLabel(faceList)];
+			if (p.isBorder(context, faceList, h)) {
 				proxyCount++;
 				labelMapping.push_back(p.label);
 				if (false == p.borderHalfEdge.isValid())
@@ -74,7 +75,7 @@ MStatus VSAMesher::initAnchors(Array<Proxy>& proxyList)
 				p.anchors.push_back(v);
 			}
 			count++;
-			he = p.nextHalfEdgeOnBorder(meshObj, he);
+			he = p.nextHalfEdgeOnBorder(context, faceList, he);
 			if (false == he.isValid())
 			{
 				ErrorReturn("Invalid halfedge walk");
@@ -85,7 +86,7 @@ MStatus VSAMesher::initAnchors(Array<Proxy>& proxyList)
 	return MS::kSuccess;
 }
 
-MStatus VSAMesher::refineAnchors(Array<Proxy>& proxyList, double threshold)
+MStatus VSAMesher::refineAnchors(double threshold)
 {
 	MStatus status;
 	// first make sure every proxy has 3 or more anchors
@@ -93,21 +94,21 @@ MStatus VSAMesher::refineAnchors(Array<Proxy>& proxyList, double threshold)
 		if (!p.valid) continue;
 		if (p.anchors.empty()) {
 			// let proxy at least have a anchor to start with
-			newAnchor(proxyList, p.borderHalfEdge.vertex());
+			newAnchor(p.borderHalfEdge.vertex());
 		}
 		if (p.anchors.size() == 1) {
 			// add an anchor to the far side of the original anchor
 			Size steps = p.borderEdgeCount / 2;
 			auto he = p.borderHalfEdge;
 			for (Size i = 0; i < steps; i++) {
-				he = p.nextHalfEdgeOnBorder(meshObj, he);
+				he = p.nextHalfEdgeOnBorder(context, faceList, he);
 			}
-			newAnchor(proxyList, he.vertex());
+			newAnchor(he.vertex());
 		}
 		if (p.anchors.size() == 2) {
 			// a threshold value of 0.0 means a split must happen regardless of the split criterion
 			// but don't recurse split
-			splitEdge(proxyList, p, p.anchors.front(), p.anchors.back(), -1.0);
+			splitEdge(p, p.anchors.front(), p.anchors.back(), -1.0);
 		}
 	} // end for loop
 
@@ -118,7 +119,7 @@ MStatus VSAMesher::refineAnchors(Array<Proxy>& proxyList, double threshold)
 		auto prev = --p.anchors.end();
 		auto next = p.anchors.begin();
 		while (next != p.anchors.end()) {
-			splitEdge(proxyList, p, *prev, *next, threshold);
+			splitEdge(p, *prev, *next, threshold);
 			prev = next;
 			next++;
 		}
@@ -126,25 +127,25 @@ MStatus VSAMesher::refineAnchors(Array<Proxy>& proxyList, double threshold)
 	return MS::kSuccess;
 }
 
-MStatus VSAMesher::buildNewVerticesList(Array<Proxy> &proxyList,
+MStatus VSAMesher::buildNewVerticesList(
 	Map<VertexIndex, VertexIndex> &newIndices,
 	MFloatPointArray &newVertices,
 	int &numVertices)
 {
 	MStatus status;
-	MItMeshVertex vertexIter(meshObj);
 	VertexIndex prev;
 	VertexIndex i = 0;
 	for (auto vpair : anchorVertices)
 	{
 		VertexIndex v = vpair.first;
-		status = vertexIter.setIndex(v, prev);
 		newIndices.insert(newEntry(v, i++));
 		auto labels = vpair.second;
 		Vector3D avgPosition = Vector3D::zero;
 		Size degree = (Size) labels.size();
+
+		context.vertexIter.setIndex(v, prev);
 		for (auto l : labels) {
-			Vector3D positionVec(vertexIter.position());
+			Vector3D positionVec(context.vertexIter.position());
 			avgPosition += pointOnPlane(positionVec, proxyList[l].normal, Vector3D(proxyList[l].centroid));
 		}
 		avgPosition *= 1.0 / (double)degree;
@@ -154,7 +155,7 @@ MStatus VSAMesher::buildNewVerticesList(Array<Proxy> &proxyList,
 	return MS::kSuccess;
 }
 
-MStatus VSAMesher::buildNewFacesList(Array<Proxy> &proxyList,
+MStatus VSAMesher::buildNewFacesList(
 	Map<VertexIndex, VertexIndex> &newIndices,
 	MIntArray &polygonCounts,
 	MIntArray &polygonConnects,
@@ -175,7 +176,7 @@ MStatus VSAMesher::buildNewFacesList(Array<Proxy> &proxyList,
 	return MS::kSuccess;
 }
 
-void VSAMesher::newAnchor(Array<Proxy>& proxyList, VertexIndex vertex)
+void VSAMesher::newAnchor(VertexIndex vertex)
 {
 	MStatus status;
 	Set<ProxyLabel> finishedLabels;
@@ -183,19 +184,18 @@ void VSAMesher::newAnchor(Array<Proxy>& proxyList, VertexIndex vertex)
 
 	// find the border halfedges corresponding to the new anchor
 	int prev;
-	MItMeshVertex vertexIter(meshObj);
 	MIntArray connectedVertices;
-	status = vertexIter.setIndex(vertex, prev);
-	status = vertexIter.getConnectedVertices(connectedVertices);
+	status = context.vertexIter.setIndex(vertex, prev);
+	status = context.vertexIter.getConnectedVertices(connectedVertices);
 
 	for (int i = 0; i < (int) connectedVertices.length(); i++)
 	{
-		HalfEdge he(meshObj, vertex, connectedVertices[i]);
+		HalfEdge he(context, vertex, connectedVertices[i]);
 		if (he.isBoundary()) continue;
-		ProxyLabel l = he.faceLabel();
+		ProxyLabel l = he.faceLabel(faceList);
 		if (finishedLabels.find(l) == finishedLabels.end())
 		{
-			proxyList[l].addAnchor(meshObj, vertex);
+			proxyList[l].addAnchor(context, faceList, vertex);
 			labelMapping.push_back(l);
 			finishedLabels.insert(l);
 		}
@@ -204,34 +204,33 @@ void VSAMesher::newAnchor(Array<Proxy>& proxyList, VertexIndex vertex)
 	anchorVertices.insert(newEntry(vertex, labelMapping));
 }
 
-VertexIndex VSAMesher::splitEdge(Array<Proxy>& proxyList, Proxy & proxy, VertexIndex v1, VertexIndex v2, double threshold)
+VertexIndex VSAMesher::splitEdge(Proxy & proxy, VertexIndex v1, VertexIndex v2, double threshold)
 {
 	MStatus status;
-	MItMeshVertex vertexIter(meshObj);
 	int prev;
 	double largestDistance = 0.0;
 	VertexIndex newAnchorVertex;
 
 	// find the vertex on edge that has largest distance to the vector (v1, v2)
-	status = vertexIter.setIndex(v1, prev);
-	Point3D v1p = vertexIter.position();
-	status = vertexIter.setIndex(v2, prev);
-	Point3D v2p = vertexIter.position();
+	status = context.vertexIter.setIndex(v1, prev);
+	Point3D v1p = context.vertexIter.position();
+	status	= context.vertexIter.setIndex(v2, prev);
+	Point3D v2p = context.vertexIter.position();
 	Vector3D v1v2 = v2p - v1p;
 	double edgeLength = v1v2.length();
 	v1v2.normalize();
 
-	auto he = proxy.findHalfEdgeOnBorder(meshObj, v1);
-	he = proxy.nextHalfEdgeOnBorder(meshObj, he);
+	auto he = proxy.findHalfEdgeOnBorder(context, faceList, v1);
+	he = proxy.nextHalfEdgeOnBorder(context, faceList, he);
 	while (he.vertex() != v2) {
-		status = vertexIter.setIndex(he.vertex(), prev);
-		Vector3D vec = vertexIter.position() - v1p;
+		status = context.vertexIter.setIndex(he.vertex(), prev);
+		Vector3D vec = context.vertexIter.position() - v1p;
 		double dist = cross(vec, v1v2).length();
 		if (dist > largestDistance) {
 			largestDistance = dist;
 			newAnchorVertex = he.vertex();
 		}
-		he = proxy.nextHalfEdgeOnBorder(meshObj, he);
+		he = proxy.nextHalfEdgeOnBorder(context, faceList, he);
 	}
 
 	if (largestDistance == 0.0)
@@ -242,26 +241,26 @@ VertexIndex VSAMesher::splitEdge(Array<Proxy>& proxyList, Proxy & proxy, VertexI
 
 	// non-recursive split:
 	if (threshold < 0) {
-		newAnchor(proxyList, newAnchorVertex);
+		newAnchor(newAnchorVertex);
 		return newAnchorVertex;
 	}
 
 	// recursive spilt:
 	double sinProxyNormals;
 	// calculate split criterion
-	auto borderHalfedge = proxy.findHalfEdgeOnBorder(meshObj, newAnchorVertex);
+	auto borderHalfedge = proxy.findHalfEdgeOnBorder(context, faceList, newAnchorVertex);
 	if (borderHalfedge.twin().isBoundary()) { sinProxyNormals = 1.0; } // we want an accurate edge
 	else {
 		Vector3D N1 = proxy.normal;
-		Vector3D N2 = proxyList[borderHalfedge.twin().faceLabel()].normal;
+		Vector3D N2 = proxyList[borderHalfedge.twin().faceLabel(faceList)].normal;
 		sinProxyNormals = cross(N1, N2).length();
 	}
 	double splitCriterion = largestDistance * sinProxyNormals / edgeLength;
 	if (splitCriterion > threshold) {
-		newAnchor(proxyList, newAnchorVertex);
+		newAnchor(newAnchorVertex);
 		// recursion
-		splitEdge(proxyList, proxy, v1, newAnchorVertex, threshold);
-		splitEdge(proxyList, proxy, newAnchorVertex, v2, threshold);
+		splitEdge(proxy, v1, newAnchorVertex, threshold);
+		splitEdge(proxy, newAnchorVertex, v2, threshold);
 		return newAnchorVertex;
 	}
 	else 

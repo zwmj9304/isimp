@@ -12,7 +12,9 @@
 #define MAYA_VSA_PROXY_H
 
 #include "vsaTypes.h"
+#include "vsaFace.h"
 #include "maya/MObject.h"
+
 // Simulate the behavior of a HalfEdge based mesh structure
 //
 class HalfEdge
@@ -20,19 +22,20 @@ class HalfEdge
 public:
 	// Constructor for invalid halfedge
 	//
-	HalfEdge() { begin = -1; end = -1; meshPtr = nullptr; }
+	HalfEdge() { begin = -1; end = -1; ctx = nullptr; }
 	~HalfEdge() {}
 
 	// New constructor
-	HalfEdge(MObject &meshObj, VertexIndex begin, VertexIndex end);
-	HalfEdge(MObject *meshPtr, VertexIndex begin, VertexIndex end);
-	// Copy constructor
-	HalfEdge(const HalfEdge &he) { begin = he.begin; end = he.end; meshPtr = he.meshPtr; }
+	HalfEdge(MeshingContext &context, VertexIndex begin, VertexIndex end);
+	HalfEdge(MeshingContext *ctx, VertexIndex begin, VertexIndex end);
 
-	static HalfEdge fromFace(MObject &meshObj, FaceIndex faceIdx);
-	static HalfEdge fromEdge(MObject &meshObj, EdgeIndex edgeIdx, 
+	// Copy constructor
+	HalfEdge(const HalfEdge &he) { *this = he; }
+
+	static HalfEdge fromFace(MeshingContext &context, FaceIndex faceIdx);
+	static HalfEdge fromEdge(MeshingContext &context, EdgeIndex edgeIdx,
 		VertexIndex startIdx=-1);
-	static HalfEdge fromVertex(MObject &meshObj, VertexIndex vertIdx);
+	static HalfEdge fromVertex(MeshingContext &context, VertexIndex vertIdx);
 
 	HalfEdge next() const;
 	HalfEdge twin() const;
@@ -40,7 +43,7 @@ public:
 	FaceIndex	face() const;
 	EdgeIndex	edge() const;
 	VertexIndex vertex() const;
-	ProxyLabel	faceLabel() const;
+	ProxyLabel	faceLabel(Array<VSAFace> &faceList) const;
 
 	bool isBoundary() const;
 	bool isValid() const;
@@ -52,7 +55,7 @@ public:
 private:
 	VertexIndex		begin;
 	VertexIndex		end;
-	MObject*		meshPtr;
+	MeshingContext	*ctx;
 };
 
 
@@ -102,17 +105,17 @@ public:
 
 	
 	// For a given border halfedge on this proxy, find the next halfedge on border
-	HalfEdge nextHalfEdgeOnBorder(MObject &mesh, const HalfEdge &he);
+	HalfEdge nextHalfEdgeOnBorder(MeshingContext &context, Array<VSAFace> &faceList, const HalfEdge &he);
 
 	// Given a boarder vertex of this proxy, find the outgoing halfedge on border
-	HalfEdge findHalfEdgeOnBorder(MObject &mesh, VertexIndex v);
+	HalfEdge findHalfEdgeOnBorder(MeshingContext &context, Array<VSAFace> &faceList, VertexIndex v);
 
 	// Determine whether a given halfedge is on the border of this proxy
-	bool isBorder(MObject &mesh, const HalfEdge &he) const;
+	bool isBorder(MeshingContext &context, Array<VSAFace> &faceList, const HalfEdge &he) const;
 
 	// Add an anchor vertex to this proxy. After adding, anchor vector should remain sorted.
 	// Requires that this vertex is on the border of this proxy.
-	void addAnchor(MObject &mesh, VertexIndex newAnchor);
+	void addAnchor(MeshingContext &context, Array<VSAFace> &faceList, VertexIndex newAnchor);
 };
 
 

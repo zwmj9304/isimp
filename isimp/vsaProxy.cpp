@@ -15,74 +15,72 @@
 #include <maya/MItMeshEdge.h>
 #include <maya/MItMeshVertex.h>
 #include <maya/MIntArray.h>
+#include <maya/MTimer.h>
+#include "vsaMesher.h"
 
 
-HalfEdge::HalfEdge(MObject &meshObj, VertexIndex begin, VertexIndex end)
+HalfEdge::HalfEdge(MeshingContext &context, VertexIndex begin, VertexIndex end)
 {
 	this->begin		= begin;
 	this->end		= end;
-	this->meshPtr	= &meshObj;
+	this->ctx		= &context;
 }
 
-HalfEdge::HalfEdge(MObject * meshPtr, VertexIndex begin, VertexIndex end)
+HalfEdge::HalfEdge(MeshingContext *ctx, VertexIndex begin, VertexIndex end)
 {
 	this->begin = begin;
 	this->end = end;
-	this->meshPtr = meshPtr;
+	this->ctx = ctx;
 }
 
-HalfEdge HalfEdge::fromFace(MObject &meshObj, FaceIndex faceIdx)
+HalfEdge HalfEdge::fromFace(MeshingContext &context, FaceIndex faceIdx)
 {
 	MStatus status;
-	MFnMesh meshFn(meshObj);
 
 	MIntArray vertexList;
-	status = meshFn.getPolygonVertices(faceIdx, vertexList);
+	status = context.meshFn.getPolygonVertices(faceIdx, vertexList);
 	if (status != MS::kSuccess || vertexList.length() < 3)
 	{
 		return HalfEdge();
 	}
-	return HalfEdge(meshObj, vertexList[0], vertexList[1]);
+	return HalfEdge(context, vertexList[0], vertexList[1]);
 }
 
-HalfEdge HalfEdge::fromEdge(MObject & meshObj, EdgeIndex edgeIdx, 
+HalfEdge HalfEdge::fromEdge(MeshingContext &context, EdgeIndex edgeIdx,
 	VertexIndex startIdx)
 {
 	MStatus status;
-	MFnMesh meshFn(meshObj);
 	int2 vertexList;
 
-	status = meshFn.getEdgeVertices(edgeIdx, vertexList);
+	status = context.meshFn.getEdgeVertices(edgeIdx, vertexList);
 	if (status != MS::kSuccess)
 	{
 		return HalfEdge();
 	}
 	if (startIdx < 0 || vertexList[0] == startIdx)
 	{
-		return HalfEdge(meshObj, vertexList[0], vertexList[1]);
+		return HalfEdge(context, vertexList[0], vertexList[1]);
 	}
 	else
 	{
-		return HalfEdge(meshObj, vertexList[1], vertexList[0]);
+		return HalfEdge(context, vertexList[1], vertexList[0]);
 	}
 }
 
-HalfEdge HalfEdge::fromVertex(MObject & meshObj, VertexIndex vertIdx)
+HalfEdge HalfEdge::fromVertex(MeshingContext &context, VertexIndex vertIdx)
 {
 	MStatus status;
-	MFnMesh meshFn(meshObj);
-	MItMeshVertex vertexIter(meshObj);
 
 	MIntArray edgeList;
 	int prevIdx;
-	status = vertexIter.setIndex(vertIdx, prevIdx);
-	status = vertexIter.getConnectedEdges(edgeList);
+	status = context.vertexIter.setIndex(vertIdx, prevIdx);
+	status = context.vertexIter.getConnectedEdges(edgeList);
 
 	if (status != MS::kSuccess || edgeList.length() < 1)
 	{
 		return HalfEdge();
 	}
-	return fromEdge(meshObj, edgeList[0], vertIdx);
+	return fromEdge(context, edgeList[0], vertIdx);
 }
 
 HalfEdge HalfEdge::next() const
@@ -95,16 +93,15 @@ HalfEdge HalfEdge::next() const
 	}
 
 	MStatus status;
-	MFnMesh meshFn(*meshPtr);
 
 	MIntArray vertexList;
-	status = meshFn.getPolygonVertices(faceIdx, vertexList);
+	status = ctx->meshFn.getPolygonVertices(faceIdx, vertexList);
 	int degree = vertexList.length();
 	for (VertexIndex v = 0; v < degree; v++)
 	{
 		if (vertexList[v] == end)
 		{
-			return HalfEdge(meshPtr, end, vertexList[(v + 1) % degree]);
+			return HalfEdge(ctx, end, vertexList[(v + 1) % degree]);
 		}
 	}
 	// Should not reach here
@@ -114,25 +111,34 @@ HalfEdge HalfEdge::next() const
 
 HalfEdge HalfEdge::twin() const
 {
-	return HalfEdge(meshPtr, end, begin);
+	return HalfEdge(ctx, end, begin);
 }
+
+int VSAMesher::m_counter[10];
+double VSAMesher::m_time[10];
 
 FaceIndex HalfEdge::face() const
 {
+	MTimer timer;
 	MStatus status;
-	MFnMesh meshFn(*meshPtr);
-	MItMeshVertex vertexIter(*meshPtr);
-
 	MIntArray faceList;
 	int prevIdx;
-	status = vertexIter.setIndex(begin, prevIdx);
-	status = vertexIter.getConnectedFaces(faceList);
+
+	timer.beginTimer();
+	status = ctx->vertexIter.setIndex(begin, prevIdx);
+	status = ctx->vertexIter.getConnectedFaces(faceList);
+	timer.endTimer();  VSAMesher::m_counter[2]++; VSAMesher::m_time[2] += timer.elapsedTime();
+
 
 	for (FaceIndex i = 0; i < (int) faceList.length(); i++)
 	{
+		timer.beginTimer();
 		MIntArray faceVertices;
-		status = meshFn.getPolygonVertices(faceList[i], faceVertices);
+		status = ctx->meshFn.getPolygonVertices(faceList[i], faceVertices);
 		int degree = faceVertices.length();
+		timer.endTimer();  VSAMesher::m_counter[3]++; VSAMesher::m_time[3] += timer.elapsedTime();
+
+		timer.beginTimer();
 		for (VertexIndex v = 0; v < degree; v++)
 		{
 			if (faceVertices[v]					== begin &&
@@ -141,6 +147,7 @@ FaceIndex HalfEdge::face() const
 				return faceList[i];
 			}
 		}
+		timer.endTimer();  VSAMesher::m_counter[4]++; VSAMesher::m_time[4] += timer.elapsedTime();
 	}
 	// This means this halfedge is an border edge
 	//
@@ -150,17 +157,15 @@ FaceIndex HalfEdge::face() const
 EdgeIndex HalfEdge::edge() const
 {
 	MStatus status;
-	MFnMesh meshFn(*meshPtr);
-	MItMeshVertex vertexIter(*meshPtr);
 
 	MIntArray edgeList;
 	int prevIdx;
-	status = vertexIter.setIndex(begin, prevIdx);
-	status = vertexIter.getConnectedEdges(edgeList);
+	status = ctx->vertexIter.setIndex(begin, prevIdx);
+	status = ctx->vertexIter.getConnectedEdges(edgeList);
 	for (EdgeIndex i = 0; i < (int) edgeList.length(); i++)
 	{
 		int2 edgeVertices;
-		status = meshFn.getEdgeVertices(edgeList[i], edgeVertices);
+		status = ctx->meshFn.getEdgeVertices(edgeList[i], edgeVertices);
 		if (edgeVertices[0] == end || edgeVertices[1] == end)
 		{
 			return edgeList[i];
@@ -176,15 +181,11 @@ VertexIndex HalfEdge::vertex() const
 	return begin;
 }
 
-ProxyLabel HalfEdge::faceLabel() const
+ProxyLabel HalfEdge::faceLabel(Array<VSAFace> &faceList) const
 {
 	FaceIndex f = face();
 	if (f < 0) return -1;
-	MFnMesh meshFn(*meshPtr);
-	ProxyLabel label;
-	meshFn.getIntBlindData(f, MFn::kMeshPolygonComponent,
-		PROXY_BLIND_DATA_ID, LABEL_BL_SHORT_NAME, label);
-	return label;
+	return faceList[f].label;
 }
 
 
@@ -212,7 +213,7 @@ HalfEdge & HalfEdge::operator=(const HalfEdge & other)
 {
 	this->begin = other.begin;
 	this->end = other.end;
-	this->meshPtr = other.meshPtr;
+	this->ctx = other.ctx;
 	return *this;
 }
 
@@ -229,27 +230,26 @@ Proxy & Proxy::operator=(const Proxy & other)
 	return *this;
 }
 
-HalfEdge Proxy::nextHalfEdgeOnBorder(MObject &mesh, const HalfEdge & he)
+HalfEdge Proxy::nextHalfEdgeOnBorder(MeshingContext &context, Array<VSAFace> &faceList, const HalfEdge & he)
 {
-	if (false == isBorder(mesh, he)) return HalfEdge();
+	if (false == isBorder(context, faceList, he)) return HalfEdge();
 	auto nextHe = he.next();
-	if (isBorder(mesh, nextHe)) return nextHe;
-	return findHalfEdgeOnBorder(mesh, nextHe.vertex());
+	if (isBorder(context, faceList, nextHe)) return nextHe;
+	return findHalfEdgeOnBorder(context, faceList, nextHe.vertex());
 }
 
-HalfEdge Proxy::findHalfEdgeOnBorder(MObject &mesh, VertexIndex v)
+HalfEdge Proxy::findHalfEdgeOnBorder(MeshingContext &context, Array<VSAFace> &faceList, VertexIndex v)
 {
 	MIntArray connectedIndices;
-	MItMeshVertex vertexIter(mesh);
 	int prev;
-	vertexIter.setIndex(v, prev);
-	vertexIter.getConnectedVertices(connectedIndices);
+	context.vertexIter.setIndex(v, prev);
+	context.vertexIter.getConnectedVertices(connectedIndices);
 	// check each of outgoing halfedge from this vertex, see
 	// if it is on border
 	for (int i = 0; i < (int) connectedIndices.length(); i++)
 	{
-		HalfEdge he = HalfEdge(mesh, v, connectedIndices[i]);
-		if (isBorder(mesh, he))
+		HalfEdge he = HalfEdge(context, v, connectedIndices[i]);
+		if (isBorder(context, faceList, he))
 		{
 			return he;
 		}
@@ -259,7 +259,7 @@ HalfEdge Proxy::findHalfEdgeOnBorder(MObject &mesh, VertexIndex v)
 
 }
 
-bool Proxy::isBorder(MObject &mesh, const HalfEdge & he) const
+bool Proxy::isBorder(MeshingContext &context, Array<VSAFace> &faceList, const HalfEdge & he) const
 {
 	if (false == he.isValid())
 	{
@@ -269,17 +269,17 @@ bool Proxy::isBorder(MObject &mesh, const HalfEdge & he) const
 	{
 		return false;
 	}
-	if (he.faceLabel() != this->label)
+	if (he.faceLabel(faceList) != this->label)
 	{
 		return false;
 	}
-	return he.twin().isBoundary() || he.twin().faceLabel() != this->label;
+	return he.twin().isBoundary() || he.twin().faceLabel(faceList) != this->label;
 }
 
-void Proxy::addAnchor(MObject &mesh, VertexIndex newAnchor)
+void Proxy::addAnchor(MeshingContext &context, Array<VSAFace> &faceList, VertexIndex newAnchor)
 {
 	// find the border halfedge corresponding to the new anchor
-	auto he = findHalfEdgeOnBorder(mesh, newAnchor);
+	auto he = findHalfEdgeOnBorder(context, faceList, newAnchor);
 
 	// TODO duplicate anchor check??
 
@@ -299,6 +299,6 @@ void Proxy::addAnchor(MObject &mesh, VertexIndex newAnchor)
 				return;
 			}
 		}
-		h = nextHalfEdgeOnBorder(mesh, h);
+		h = nextHalfEdgeOnBorder(context, faceList, h);
 	} while (h != he);
 }
