@@ -73,7 +73,7 @@ MStatus VSAMesher::initAnchors()
 		do {
 			auto v = he.vertex();
 			if (anchorVertices.find(v) != anchorVertices.end()) {
-				p.anchors.push_back(v);
+				p.anchors.push_back(he);
 			}
 			count++;
 			he = p.nextHalfEdgeOnBorder(context, faceList, he);
@@ -109,7 +109,8 @@ MStatus VSAMesher::refineAnchors(double threshold)
 		if (p.anchors.size() == 2) {
 			// a threshold value of 0.0 means a split must happen regardless of the split criterion
 			// but don't recurse split
-			auto anchorHe = p.findHalfEdgeOnBorder(context, faceList, p.anchors.front());
+			//auto anchorHe = p.findHalfEdgeOnBorder(context, faceList, p.anchors.front());
+			auto anchorHe = p.anchors.front();
 			splitEdge(p, anchorHe, p.anchors.back(), -1.0);
 		}
 	} // end for loop
@@ -121,8 +122,8 @@ MStatus VSAMesher::refineAnchors(double threshold)
 		auto prev = --p.anchors.end();
 		auto next = p.anchors.begin();
 		while (next != p.anchors.end()) {
-			auto anchorHe = p.findHalfEdgeOnBorder(context, faceList, *prev);
-			splitEdge(p, anchorHe, *next, threshold);
+			//auto anchorHe = p.findHalfEdgeOnBorder(context, faceList, *prev);
+			splitEdge(p, *prev, *next, threshold);
 			prev = next;
 			next++;
 		}
@@ -168,9 +169,9 @@ MStatus VSAMesher::buildNewFacesList(
 	{
 		Size currentFaceCount = (Size) p.anchors.size();
 		if (false == p.valid) continue;
-		for (auto v : p.anchors)
+		for (auto h : p.anchors)
 		{
-			VertexIndex currentIndex = newIndices[v];
+			VertexIndex currentIndex = newIndices[h.vertex()];
 			polygonConnects.append(currentIndex);
 		}
 		polygonCounts.append(currentFaceCount);
@@ -198,7 +199,7 @@ void VSAMesher::newAnchor(VertexIndex vertex)
 		ProxyLabel l = he.faceLabel(faceList);
 		if (finishedLabels.find(l) == finishedLabels.end())
 		{
-			proxyList[l].addAnchor(context, faceList, vertex);
+			proxyList[l].addAnchor(context, faceList, he);
 			labelMapping.push_back(l);
 			finishedLabels.insert(l);
 		}
@@ -207,7 +208,7 @@ void VSAMesher::newAnchor(VertexIndex vertex)
 	anchorVertices.insert(newEntry(vertex, labelMapping));
 }
 
-HalfEdge VSAMesher::splitEdge(Proxy & proxy, HalfEdge v1h, VertexIndex v2, double threshold)
+HalfEdge VSAMesher::splitEdge(Proxy & proxy, HalfEdge v1h, HalfEdge v2h, double threshold)
 {
 	MStatus status;
 	int prev;
@@ -218,7 +219,7 @@ HalfEdge VSAMesher::splitEdge(Proxy & proxy, HalfEdge v1h, VertexIndex v2, doubl
 	// find the vertex on edge that has largest distance to the vector (v1, v2)
 	status = context.vertexIter.setIndex(v1h.vertex(), prev);
 	Point3D v1p = context.vertexIter.position();
-	status	= context.vertexIter.setIndex(v2, prev);
+	status	= context.vertexIter.setIndex(v2h.vertex(), prev);
 	Point3D v2p = context.vertexIter.position();
 	Vector3D v1v2 = v2p - v1p;
 	double edgeLength = v1v2.length();
@@ -227,7 +228,7 @@ HalfEdge VSAMesher::splitEdge(Proxy & proxy, HalfEdge v1h, VertexIndex v2, doubl
 	//auto he = proxy.findHalfEdgeOnBorder(context, faceList, v1);
 	auto he = v1h;
 	he = proxy.nextHalfEdgeOnBorder(context, faceList, he);
-	while (he.vertex() != v2) {
+	while (he != v2h) {
 		status = context.vertexIter.setIndex(he.vertex(), prev);
 		Vector3D vec = context.vertexIter.position() - v1p;
 		double dist = cross(vec, v1v2).length();
@@ -269,8 +270,8 @@ HalfEdge VSAMesher::splitEdge(Proxy & proxy, HalfEdge v1h, VertexIndex v2, doubl
 		VertexIndex newAnchorVertex = newAnchorHalfEdge.vertex();
 		newAnchor(newAnchorVertex);
 		// recursion
-		splitEdge(proxy, v1h, newAnchorVertex, threshold);
-		splitEdge(proxy, newAnchorHalfEdge, v2, threshold);
+		splitEdge(proxy, v1h, newAnchorHalfEdge, threshold);
+		splitEdge(proxy, newAnchorHalfEdge, v2h, threshold);
 		return newAnchorHalfEdge;
 	}
 	else 

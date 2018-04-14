@@ -60,6 +60,29 @@ private:
 };
 
 
+class BorderRing {
+public:
+	BorderRing()
+	{
+		borderHalfEdge = HalfEdge();
+		borderEdgeCount = -1;
+	}
+
+	BorderRing(HalfEdge borderHalfEdge, Size borderEdgeCount)
+	{
+		this->borderHalfEdge = borderHalfEdge;
+		this->borderEdgeCount = borderEdgeCount;
+	}
+
+	// Used by meshing routines, each ring reprensents a one closed boundary
+	// Holes in polygons are supported in this way
+	//
+	HalfEdge borderHalfEdge;
+	Size borderEdgeCount;
+	List<VertexIndex> anchors; ///< anchors must be sorted by the same order of halfedge
+};
+
+
 class Proxy {
 public:
 	Proxy()
@@ -67,9 +90,9 @@ public:
 		this->valid = true;
 		this->label = -1;
 		this->seed = -1;
-		this->borderEdgeCount = -1;
 		this->normal = Vector3D::zero;
 		this->centroid = Point3D::origin;
+		this->borderEdgeCount = -1;
 		this->borderHalfEdge = HalfEdge();
 	}
 	Proxy(ProxyLabel label)
@@ -99,10 +122,19 @@ public:
 
 	ProxyLabel label;
 
-	/** Used by meshing routines */
 	HalfEdge borderHalfEdge;
 	Size borderEdgeCount;
-	List<VertexIndex> anchors; ///< anchors must be sorted by the same order of halfedge
+	List<HalfEdge> anchors;
+
+	// Used by meshing routines, each ring reprensents a one closed boundary
+	// Holes in polygons are supported in this way
+	//
+	// Note:
+	// The first border ring in the list indicates the outer border of this polygon
+	// The remaining rings are essentially holes in this polygon
+	//
+	//List<BorderRing> borderRings;
+	//Set<HalfEdge> borderHalfEdges;
 
 	// For a given border halfedge on this proxy, find the next halfedge on border
 	HalfEdge nextHalfEdgeOnBorder(MeshingContext &context, Array<VSAFace> &faceList, const HalfEdge &he);
@@ -115,7 +147,11 @@ public:
 
 	// Add an anchor vertex to this proxy. After adding, anchor vector should remain sorted.
 	// Requires that this vertex is on the border of this proxy.
-	void addAnchor(MeshingContext &context, Array<VSAFace> &faceList, VertexIndex newAnchor);
+	void addAnchor(MeshingContext &context, Array<VSAFace> &faceList, HalfEdge newAnchorHe);
+
+	// Add a new border ring to this proxy
+	// The return value indicates whether addRing succeeded
+	bool addRing(HalfEdge borderHalfEdge);
 };
 
 

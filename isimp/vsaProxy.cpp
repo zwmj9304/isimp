@@ -254,6 +254,8 @@ Proxy & Proxy::operator=(const Proxy & other)
 	this->borderHalfEdge	= other.borderHalfEdge;
 	this->anchors			= other.anchors;
 	this->borderEdgeCount	= other.borderEdgeCount;
+	//this->borderRings = other.borderRings;
+	//this->borderHalfEdges = other.borderHalfEdges;
 	return *this;
 }
 
@@ -321,30 +323,36 @@ bool Proxy::isBorder(MeshingContext &context, Array<VSAFace> &faceList, const Ha
 	return he.twin().isBoundary() || he.twin().faceLabel(faceList) != this->label;
 }
 
-void Proxy::addAnchor(MeshingContext &context, Array<VSAFace> &faceList, VertexIndex newAnchor)
+void Proxy::addAnchor(MeshingContext &context, Array<VSAFace> &faceList, HalfEdge newAnchorHe)
 {
 	// find the border halfedge corresponding to the new anchor
-	auto he = findHalfEdgeOnBorder(context, faceList, newAnchor);
+	// auto he = findHalfEdgeOnBorder(context, faceList, newAnchor);
 
 	// TODO duplicate anchor check??
 
 	// simple case
 	if (anchors.size() < 2) {
-		anchors.push_back(newAnchor);
+		anchors.push_back(newAnchorHe);
 		return;
 	}
 
 	// more complicated case:
 	// travel along the border to find the anchor after it
 	// as in the hole case, no anchor will be added for this proxy
-	auto h = he;
+	auto h = newAnchorHe;
 	do {
+		// TODO this loop is silly, can be replaced by two pointers
 		for (auto it = anchors.begin(); it != anchors.end(); it++) {
-			if (h.vertex() == *it) {
-				anchors.insert(it, newAnchor);
+			if (h == *it) {
+				anchors.insert(it, newAnchorHe);
 				return;
 			}
 		}
 		h = nextHalfEdgeOnBorder(context, faceList, h);
-	} while (h != he);
+	} while (h != newAnchorHe);
+}
+
+bool Proxy::addRing(HalfEdge borderHalfEdge)
+{
+	return false;
 }

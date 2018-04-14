@@ -48,11 +48,14 @@ private:
 	Array<Proxy>	&proxyList;
 	Array<VSAFace>	&faceList;
 
+	// The global map that records potential anchor vertices
+	// Note that anchors here should be stored as vertices instead of halfedge
+	// because it is shared among different proxies
 	Map<VertexIndex, Array<ProxyLabel>> anchorVertices;
 
 	void newAnchor(VertexIndex vertex);
 	HalfEdge splitEdge(Proxy &proxy, 
-		HalfEdge v1h, VertexIndex v2, double threshold);
+		HalfEdge v1h, HalfEdge v2h, double threshold);
 
 	// cross product
 	static inline Vector3D cross(const Vector3D& u, const Vector3D& v);
