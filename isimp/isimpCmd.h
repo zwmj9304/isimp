@@ -84,13 +84,15 @@ private:
 	MObject						fComponentList;
 	MIntArray					fComponentIDs;
 	MeshOperation				fOperation;
+	int							fNumProxies;
+	int							fNumIterations;
 
 	// meshOp Factory
 	//
 	isimpFty				fmeshOpFactory;
 
 	// internal Routines
-	bool		checkInvalidInput(const MArgList& argList);
+	bool		parseCmdArgs(const MArgList& argList);
 };
 
 #endif

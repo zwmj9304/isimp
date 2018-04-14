@@ -28,7 +28,8 @@
 #include <maya/MSelectionList.h>
 #include <maya/MPlug.h>
 #include <maya/MArgList.h>
-
+#include <maya/MArgParser.h>
+#include <maya/MSyntax.h>
 #include <maya/MIOStream.h>
 
 isimp::isimp()
@@ -64,7 +65,7 @@ MStatus isimp::doIt(const MArgList& argList)
 //
 {
 	MStatus status;
-	if (true == checkInvalidInput(argList))
+	if (true == parseCmdArgs(argList))
 	{
 		return MS::kFailure;
 	}
@@ -274,6 +275,16 @@ MStatus isimp::initModifierNode(MObject modifierNode)
 	MPlug opTypePlug(modifierNode, opTypeAttr);
 	status = opTypePlug.setValue(fOperation);
 
+	// Similarly for the numProxies, numIterations and edgeSplitThreshold
+	//
+	MObject nProxiesAttr = depNodeFn.attribute("nProxies");
+	MPlug nProxiesPlug(modifierNode, nProxiesAttr);
+	status = nProxiesPlug.setValue(fNumProxies);
+
+	MObject nIterAttr = depNodeFn.attribute("nIter");
+	MPlug nIterPlug(modifierNode, nIterAttr);
+	status = nIterPlug.setValue(fNumIterations);
+
 	return status;
 }
 
@@ -293,38 +304,92 @@ MStatus isimp::directModifier(MObject mesh)
 	return status;
 }
 
-bool isimp::checkInvalidInput(const MArgList & argList)
+bool isimp::parseCmdArgs(const MArgList & argList)
 {
 	bool badArgument = false;
-	// Only one parameter is expected to be passed to this command: the mesh
-	// operation type. Get it, validate it or stop prematurely
-	//
-	if (argList.length() == 1)
+
+	MStatus status;
+	MSyntax syntax;
+	// INPUT FLAGS:
+	syntax.addFlag("-p", "-proxy", MSyntax::kUnsigned);
+	syntax.addFlag("-i", "-iter", MSyntax::kUnsigned);
+	syntax.addArg(MSyntax::kString);
+	MArgParser argParser(syntax, argList);
+
+	// first get operation type
+	MString operationTypeArgument;
+	argParser.getCommandArgument(0, operationTypeArgument);
+	if (status != MS::kSuccess)
 	{
-		int operationTypeArgument = argList.asInt(0);
-		if (operationTypeArgument < 0
-			|| operationTypeArgument > kMeshOperationCount - 1)
+		badArgument = true;
+	}
+	else if (operationTypeArgument == "init")
+	{
+		fOperation = kFlood;
+	}
+	else if (operationTypeArgument == "mesh")
+	{
+		fOperation = kGenerate;
+	}
+	else if (operationTypeArgument == "add")
+	{
+		fOperation = kAddProxyBySeed;
+	}
+	else if (operationTypeArgument == "del")
+	{
+		fOperation = kDeleteProxyBySeed;
+	}
+	//else if (operationTypeArgument == "paint")
+	//{
+	//	fOperation = kPaintProxyByFace;
+	//}
+	else if (operationTypeArgument == "color")
+	{
+		fOperation = kRefresh;
+	}
+	else
+	{
+		badArgument = true;
+	}
+
+	// then parse flags
+	if (argParser.isFlagSet("-proxy"))
+	{
+		status = argParser.getFlagArgument("-proxy", 0, fNumProxies);
+		if (status != MS::kSuccess)
 		{
 			badArgument = true;
 		}
-		else
+	}
+	else
+	{
+		fNumProxies = 6;
+	}
+
+	if (argParser.isFlagSet("-iter"))
+	{
+		status = argParser.getFlagArgument("-iter", 0, fNumIterations);
+		if (status != MS::kSuccess)
 		{
-			fOperation = (MeshOperation)operationTypeArgument;
+			badArgument = true;
 		}
 	}
-	else badArgument = true;
+	else
+	{
+		fNumIterations = 10;
+	}
+	// badArgument = true;
 
 	if (badArgument)
 	{
-		cerr << "Expecting one parameter: the operation type." << endl;
-		cerr << "Valid types are: " << endl;
-		cerr << "   0 - Flood." << endl;
-		cerr << "   1 - Generate Simplified Mesh." << endl;
-		cerr << "   2 - Add a Region." << endl;
-		cerr << "   3 - Delete a Region." << endl;
-		cerr << "   4 - Paint a New Region." << endl;
-		cerr << "   5 - Turn on color display." << endl;
-		displayError(" Expecting one parameter: the operation type.");
+		cerr << "Valid arguments are: " << endl;
+		cerr << "   init  - Flood." << endl;
+		cerr << "   mesh  - Generate Simplified Mesh." << endl;
+		cerr << "   add   - Add a Region." << endl;
+		cerr << "   del   - Delete a Region." << endl;
+		//cerr << "   paint - Paint a New Region." << endl;
+		cerr << "   color - Turn on color display." << endl;
+		displayError(" Invalid arguments for isimp. Try: init, mesh, add, del, color");
 	}
 	return badArgument;
 }
