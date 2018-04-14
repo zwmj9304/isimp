@@ -61,9 +61,6 @@ MStatus VSAMesher::initAnchors()
 			anchorVertices.insert(newEntry(v, labelMapping));
 		}
 	}
-
-	// TODO: delete island proxies, must run before assigning borders
-
 	// initialize the sorted anchor list for all proxies
 	for (auto &p : proxyList) {
 		if (!p.valid) continue;

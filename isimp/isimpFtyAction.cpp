@@ -61,11 +61,13 @@ MStatus isimpFty::doIt()
 		status = doDelProxy();
 		break; }
 	//case kPaintProxyByFace: {
+	//  cout << "[iSimp] Command 4: Paint Region" << endl;
 	//	status = doPaintProxy();
 	//	break; }
-	//case kRefresh: {
-	//	status = doReFlooding();
-	//	break; }
+	case kRefresh: {
+		cout << "[iSimp] Command 5: Turn On Color Display" << endl;
+		status = doReFlooding();
+		break; }
 	default:
 		status = MS::kFailure;
 		break;
@@ -181,8 +183,7 @@ MStatus isimpFty::doMeshing()
 	status = meshFn.updateSurface();
 
 	timer.endTimer();
-	cout << "[iSimp] Rebuild Lists Time   " << timer.elapsedTime() << "s" << endl;
-	cout << "[iSimp] Meshing              " << timer.elapsedTime() << "s" << endl;
+	cout << "[iSimp] Meshing Time         " << timer.elapsedTime() << "s" << endl;
 	return status;
 }
 
@@ -323,6 +324,12 @@ MStatus isimpFty::doPaintProxy()
 	cout << numCalls << " e-f connection calls " << edgeTime << "s" << endl;
 
 	return status;
+}
+
+MStatus isimpFty::doReFlooding()
+{
+	// Use this command to turn on color display in undo cases
+	return MS::kSuccess;
 }
 
 MStatus isimpFty::buildFaceNeighbors()

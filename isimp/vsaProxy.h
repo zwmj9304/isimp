@@ -104,7 +104,6 @@ public:
 	Size borderEdgeCount;
 	List<VertexIndex> anchors; ///< anchors must be sorted by the same order of halfedge
 
-	
 	// For a given border halfedge on this proxy, find the next halfedge on border
 	HalfEdge nextHalfEdgeOnBorder(MeshingContext &context, Array<VSAFace> &faceList, const HalfEdge &he);
 

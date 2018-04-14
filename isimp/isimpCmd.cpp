@@ -323,7 +323,7 @@ bool isimp::checkInvalidInput(const MArgList & argList)
 		cerr << "   2 - Add a Region." << endl;
 		cerr << "   3 - Delete a Region." << endl;
 		cerr << "   4 - Paint a New Region." << endl;
-		cerr << "   5 - Re-flood." << endl;
+		cerr << "   5 - Turn on color display." << endl;
 		displayError(" Expecting one parameter: the operation type.");
 	}
 	return badArgument;
