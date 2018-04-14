@@ -45,15 +45,19 @@ MStatus isimpFty::doIt()
 	switch (fOperationType)
 	{
 	case kFlood: {
+		cout << "[iSimp] Command 0: Flood" << endl;
 		status = doFlooding();
 		break; }
 	case kGenerate: {
+		cout << "[iSimp] Command 1: Generate Mesh" << endl;
 		status = doMeshing();
 		break; }
 	case kAddProxyBySeed: {
+		cout << "[iSimp] Command 2: Add Region" << endl;
 		status = doAddProxy();
 		break; }
 	case kDeleteProxyBySeed: {
+		cout << "[iSimp] Command 3: Delete Region" << endl;
 		status = doDelProxy();
 		break; }
 	//case kPaintProxyByFace: {
@@ -66,6 +70,10 @@ MStatus isimpFty::doIt()
 		status = MS::kFailure;
 		break;
 	}
+
+	// free resources when finished
+	faceList.clear();
+	proxyList.clear();
 
 	return status;
 }
@@ -86,7 +94,7 @@ MStatus isimpFty::doFlooding() {
 	timer.beginTimer();
 	status = buildFaceNeighbors();
 	timer.endTimer();
-	cout << "[iSimp] Build Neighbors Time " << timer.elapsedTime() << endl;
+	cout << "[iSimp] Build Neighbors Time " << timer.elapsedTime() << "s" << endl;
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
 	// Run Distortion Minimizing Flooding on given mesh using attributes
@@ -122,7 +130,7 @@ MStatus isimpFty::doFlooding() {
 	timer.beginTimer();
 	status = getFloodingResult();
 	timer.endTimer();
-	cout << "[iSimp] Get Result Time " << timer.elapsedTime() << endl;
+	cout << "[iSimp] Get Result Time " << timer.elapsedTime() << "s" << endl;
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
 	return status;
@@ -131,14 +139,18 @@ MStatus isimpFty::doFlooding() {
 MStatus isimpFty::doMeshing()
 {
 	MStatus status;
-	MFnMesh meshFn(fMesh);
-	MItMeshEdge edgeIt(fMesh);
-	MItMeshPolygon faceIt(fMesh);
-	MItMeshVertex vertIt(fMesh);
+	MTimer timer;
 
 	// First, get faceNeighbor and proxy information from input mesh
 	status = rebuildLists();
 	CHECK_MSTATUS_AND_RETURN_IT(status);
+
+	timer.beginTimer();
+
+	MFnMesh meshFn(fMesh);
+	MItMeshEdge edgeIt(fMesh);
+	MItMeshPolygon faceIt(fMesh);
+	MItMeshVertex vertIt(fMesh);
 
 	VSAMesher mesher(fMesh, proxyList, faceList, meshFn, faceIt, edgeIt, vertIt);
 	// First run VSA routines to find anchor vertices
@@ -167,6 +179,10 @@ MStatus isimpFty::doMeshing()
 	status = meshFn.createInPlace(numVertices, numPolygons, newVertices, polygonCounts, polygonConnects);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 	status = meshFn.updateSurface();
+
+	timer.endTimer();
+	cout << "[iSimp] Rebuild Lists Time   " << timer.elapsedTime() << "s" << endl;
+	cout << "[iSimp] Meshing              " << timer.elapsedTime() << "s" << endl;
 	return status;
 }
 
@@ -316,6 +332,8 @@ MStatus isimpFty::buildFaceNeighbors()
 
 	Size numFaces = meshFn.numPolygons(&status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
+	cout << "[iSimp] Mesh has " << numFaces << " faces" << endl;
+
 	faceList.clear();
 	faceList.resize(numFaces);
 	MItMeshPolygon faceIter(fMesh);
@@ -357,11 +375,6 @@ MStatus isimpFty::getFloodingResult()
 		status = meshFn.setIntBlindData(i, MFn::kMeshPolygonComponent, 
 			PROXY_BLIND_DATA_ID, LABEL_BL_SHORT_NAME, label);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
-
-		//bool isSeed = label < 0 ? false : (proxyList[label].seed == i);
-		//status = meshFn.setBoolBlindData(i, MFn::kMeshPolygonComponent,
-		//	PROXY_BLIND_DATA_ID, SEED_BL_SHORT_NAME, isSeed);
-		//CHECK_MSTATUS_AND_RETURN_IT(status);
 	}
 	return MS::kSuccess;
 }
@@ -391,16 +404,21 @@ MStatus isimpFty::checkOrCreateBlindDataType()
 
 MStatus isimpFty::rebuildLists()
 {
+	MTimer timer;
+	timer.beginTimer();
+
 	MStatus status;
 	MFnMesh meshFn(fMesh);
 	MItMeshPolygon faceIter(fMesh);
+	MIntArray polygonIDs, proxyLabels;
 
-	if (false == meshFn.hasBlindData(MFn::kMeshPolygonComponent,
-		PROXY_BLIND_DATA_ID, &status))
+	status = meshFn.getIntBlindData(MFn::kMeshPolygonComponent,
+		PROXY_BLIND_DATA_ID, LABEL_BL_SHORT_NAME, polygonIDs, proxyLabels);
+	MCheckStatus(status, "getting proxy information failed");
+	if (polygonIDs.length() != meshFn.numPolygons())
 	{
-		ErrorReturn("getting proxy information from mesh");
+		ErrorReturn("not all faces were assigned proxy information");
 	}
-	CHECK_MSTATUS_AND_RETURN_IT(status);
 
 	int highestLabel = -1;
 	int numFaces = meshFn.numPolygons();
@@ -412,18 +430,14 @@ MStatus isimpFty::rebuildLists()
 	//
 	Map<ProxyLabel, FaceIndex> labelMap;
 
-	for (FaceIndex i = 0; i < numFaces; i++)
+	for (int id = 0; id < numFaces; id++)
 	{
+		FaceIndex i = polygonIDs[id];
+		ProxyLabel label = proxyLabels[id];
 		status = faceIter.setIndex(i, prev);
 		MCheckStatus(status, "non-contiguous polygon indexing");
-		ProxyLabel label;
-		// TODO
-		// THE FOLLOWING LINE IS VERY SLOW!!!!!
-		status = meshFn.getIntBlindData(i, MFn::kMeshPolygonComponent, 
-			PROXY_BLIND_DATA_ID, LABEL_BL_SHORT_NAME, label);
-		MCheckStatus(status, "getting proxy information from mesh");
-		highestLabel = label > highestLabel ? label : highestLabel;
 
+		highestLabel = label > highestLabel ? label : highestLabel;
 		// rebuild faceList with label information
 		VSAFace face(label);
 		status = VSAFace::build(face, faceIter, i);
@@ -463,9 +477,12 @@ MStatus isimpFty::rebuildLists()
 		}
 		proxyList.push_back(newProxy);
 	}
-
+	
 	// Recalculate normal, centroid and seed for each proxy
 	VSAFlooding::fitProxy(faceList, proxyList);
+
+	timer.endTimer();
+	cout << "[iSimp] Rebuild Lists Time   " << timer.elapsedTime() << "s" << endl;
 
 	return status;
 }

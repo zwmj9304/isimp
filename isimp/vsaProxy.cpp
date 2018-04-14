@@ -109,6 +109,33 @@ HalfEdge HalfEdge::next() const
 	return HalfEdge();
 }
 
+HalfEdge HalfEdge::prev() const
+{
+	FaceIndex faceIdx = face();
+	if (faceIdx < 0)
+	{
+		// TODO add support on border halfedges
+		return HalfEdge();
+	}
+
+	MStatus status;
+
+	MIntArray vertexList;
+	status = ctx->meshFn.getPolygonVertices(faceIdx, vertexList);
+	int degree = vertexList.length();
+	for (VertexIndex v = 0; v < degree; v++)
+	{
+		if (vertexList[v] == begin)
+		{
+			return HalfEdge(ctx, vertexList[(v - 1 + degree) % degree], begin);
+		}
+	}
+	// Should not reach here
+	//
+	return HalfEdge();
+
+}
+
 HalfEdge HalfEdge::twin() const
 {
 	return HalfEdge(ctx, end, begin);
@@ -232,10 +259,28 @@ Proxy & Proxy::operator=(const Proxy & other)
 
 HalfEdge Proxy::nextHalfEdgeOnBorder(MeshingContext &context, Array<VSAFace> &faceList, const HalfEdge & he)
 {
+	//if (false == isBorder(context, faceList, he)) return HalfEdge();
+	//auto nextHe = he.next();
+	//if (isBorder(context, faceList, nextHe)) return nextHe;
+	//return findHalfEdgeOnBorder(context, faceList, nextHe.vertex());
+
 	if (false == isBorder(context, faceList, he)) return HalfEdge();
+	// Assuming counter-clockwise halfedge orientation
+	// Triangle to the right side SHOULD belong to a different proxy
+	//
+	// Always go to the left side to find next halfedge on border
 	auto nextHe = he.next();
-	if (isBorder(context, faceList, nextHe)) return nextHe;
-	return findHalfEdgeOnBorder(context, faceList, nextHe.vertex());
+	while (nextHe != he)
+	{
+		if (isBorder(context, faceList, nextHe))
+		{
+			return nextHe;
+		}
+		nextHe = nextHe.twin().next();
+	}
+
+	// Should not reach here
+	return HalfEdge();
 }
 
 HalfEdge Proxy::findHalfEdgeOnBorder(MeshingContext &context, Array<VSAFace> &faceList, VertexIndex v)
@@ -291,6 +336,7 @@ void Proxy::addAnchor(MeshingContext &context, Array<VSAFace> &faceList, VertexI
 
 	// more complicated case:
 	// travel along the border to find the anchor after it
+	// as in the hole case, no anchor will be added for this proxy
 	auto h = he;
 	do {
 		for (auto it = anchors.begin(); it != anchors.end(); it++) {

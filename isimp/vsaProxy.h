@@ -38,6 +38,7 @@ public:
 	static HalfEdge fromVertex(MeshingContext &context, VertexIndex vertIdx);
 
 	HalfEdge next() const;
+	HalfEdge prev() const;
 	HalfEdge twin() const;
 
 	FaceIndex	face() const;

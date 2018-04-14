@@ -143,6 +143,9 @@
       <ImportLibrary>$(Configuration)\isimp.lib</ImportLibrary>
       <ProgramDatabaseFile>$(Configuration)\isimp.pdb</ProgramDatabaseFile>
     </Link>
+    <PostBuildEvent>
+      <Command>copy $(Configuration)\isimp.mll ..\plug-ins</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

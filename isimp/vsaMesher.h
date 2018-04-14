@@ -51,8 +51,8 @@ private:
 	Map<VertexIndex, Array<ProxyLabel>> anchorVertices;
 
 	void newAnchor(VertexIndex vertex);
-	VertexIndex splitEdge(Proxy &proxy, 
-		VertexIndex v1, VertexIndex v2, double threshold);
+	HalfEdge splitEdge(Proxy &proxy, 
+		HalfEdge v1h, VertexIndex v2, double threshold);
 
 	// cross product
 	static inline Vector3D cross(const Vector3D& u, const Vector3D& v);

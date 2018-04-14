@@ -1,2 +1,3 @@
-flushUndo;
-unloadPlugin isimp;
+loadPlugin isimp;
+isimp 0;
+setAttr "isimpNode1.nProxies" 50;
