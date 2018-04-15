@@ -15,6 +15,7 @@
 #include "maya/MFnMesh.h"
 #include "maya/MGlobal.h"
 #include "maya/MFloatPointArray.h"
+#include "maya/MPointArray.h"
 
 MStatus VSAMesher::initAnchors()
 {
@@ -44,16 +45,19 @@ MStatus VSAMesher::initAnchors()
 			}
 			Proxy &p = proxyList[h.faceLabel(faceList)];
 			if (p.isBorder(context, faceList, h)) {
+				if (p.borderHalfEdges.find(h) == p.borderHalfEdges.end())
+				{
+					if (false == p.addRing(context, faceList, h))
+					{
+						ErrorReturn("Add ring error");
+					}
+				}
 				if (connectedProxies.find(p.label) != connectedProxies.end())
 				{
 					// This proxies has been seen before
 					continue;
 				}
 				labelMapping.push_back(p.label);
-				if (false == p.borderHalfEdge.isValid())
-				{
-					p.borderHalfEdge = h;
-				}
 				connectedProxies.insert(p.label);
 			}
 		}
@@ -64,25 +68,32 @@ MStatus VSAMesher::initAnchors()
 	// initialize the sorted anchor list for all proxies
 	for (auto &p : proxyList) {
 		if (!p.valid) continue;
-		// visit all border vertices in order
-		Size count = 0;
-		auto he = p.borderHalfEdge;
-		if (false == he.isValid()) {
-			ErrorReturn("Unassigned proxy during meshing init");
-		}
-		do {
-			auto v = he.vertex();
-			if (anchorVertices.find(v) != anchorVertices.end()) {
-				p.anchors.push_back(he);
+		// for all borders, visit all border vertices in order
+		// iterate through all rings
+		for (auto &ring : p.borderRings)
+		{
+			Size count = 0;
+			auto he = ring.borderHalfEdge;
+			if (false == he.isValid()) {
+				ErrorReturn("Unassigned proxy during meshing init");
 			}
-			count++;
-			he = p.nextHalfEdgeOnBorder(context, faceList, he);
-			if (false == he.isValid())
+			do {
+				auto v = he.vertex();
+				if (anchorVertices.find(v) != anchorVertices.end()) {
+					ring.anchors.push_back(he);
+				}
+				count++;
+				he = p.nextHalfEdgeOnBorder(context, faceList, he);
+				if (false == he.isValid())
+				{
+					ErrorReturn("Invalid halfedge walk");
+				}
+			} while (he != ring.borderHalfEdge);
+			if (ring.borderEdgeCount != count)
 			{
-				ErrorReturn("Invalid halfedge walk");
+				ErrorReturn("Inconsistent borderEdgeCount");
 			}
-		} while (he != p.borderHalfEdge);
-		p.borderEdgeCount = count;
+		}
 	}
 	return MS::kSuccess;
 }
@@ -93,25 +104,29 @@ MStatus VSAMesher::refineAnchors(double threshold)
 	// first make sure every proxy has 3 or more anchors
 	for (auto &p : proxyList) {
 		if (!p.valid) continue;
-		if (p.anchors.empty()) {
-			// let proxy at least have a anchor to start with
-			newAnchor(p.borderHalfEdge.vertex());
-		}
-		if (p.anchors.size() == 1) {
-			// add an anchor to the far side of the original anchor
-			Size steps = p.borderEdgeCount / 2;
-			auto he = p.borderHalfEdge;
-			for (Size i = 0; i < steps; i++) {
-				he = p.nextHalfEdgeOnBorder(context, faceList, he);
+		// iterate through all rings
+		for (auto &ring : p.borderRings)
+		{
+			if (ring.anchors.empty()) {
+				// let proxy at least have a anchor to start with
+				newAnchor(ring.borderHalfEdge.vertex());
 			}
-			newAnchor(he.vertex());
-		}
-		if (p.anchors.size() == 2) {
-			// a threshold value of 0.0 means a split must happen regardless of the split criterion
-			// but don't recurse split
-			//auto anchorHe = p.findHalfEdgeOnBorder(context, faceList, p.anchors.front());
-			auto anchorHe = p.anchors.front();
-			splitEdge(p, anchorHe, p.anchors.back(), -1.0);
+			if (ring.anchors.size() == 1) {
+				// add an anchor to the far side of the original anchor
+				Size steps = ring.borderEdgeCount / 2;
+				auto he = ring.borderHalfEdge;
+				for (Size i = 0; i < steps; i++) {
+					he = p.nextHalfEdgeOnBorder(context, faceList, he);
+				}
+				newAnchor(he.vertex());
+			}
+			if (ring.anchors.size() == 2) {
+				// a threshold value of 0.0 means a split must happen regardless of the split criterion
+				// but don't recurse split
+				//auto anchorHe = p.findHalfEdgeOnBorder(context, faceList, p.anchors.front());
+				auto anchorHe = ring.anchors.front();
+				splitEdge(p, anchorHe, ring.anchors.back(), -1.0);
+			}
 		}
 	} // end for loop
 
@@ -119,13 +134,17 @@ MStatus VSAMesher::refineAnchors(double threshold)
 	// TODO each edge is actually checked twice for split, fix by keeping track of split edges
 	for (auto &p : proxyList) {
 		if (!p.valid) continue;
-		auto prev = --p.anchors.end();
-		auto next = p.anchors.begin();
-		while (next != p.anchors.end()) {
-			//auto anchorHe = p.findHalfEdgeOnBorder(context, faceList, *prev);
-			splitEdge(p, *prev, *next, threshold);
-			prev = next;
-			next++;
+		// iterate through all rings
+		for (auto &ring : p.borderRings)
+		{
+			auto prev = --ring.anchors.end();
+			auto next = ring.anchors.begin();
+			while (next != ring.anchors.end()) {
+				//auto anchorHe = p.findHalfEdgeOnBorder(context, faceList, *prev);
+				splitEdge(p, *prev, *next, threshold);
+				prev = next;
+				next++;
+			}
 		}
 	}
 	return MS::kSuccess;
@@ -167,9 +186,11 @@ MStatus VSAMesher::buildNewFacesList(
 {
 	for (auto &p : proxyList) 
 	{
-		Size currentFaceCount = (Size) p.anchors.size();
+		// only use the outer ring for first step
+		auto outerRing = p.borderRings.front();
+		Size currentFaceCount = (Size)outerRing.anchors.size();
 		if (false == p.valid) continue;
-		for (auto h : p.anchors)
+		for (auto &h : outerRing.anchors)
 		{
 			VertexIndex currentIndex = newIndices[h.vertex()];
 			polygonConnects.append(currentIndex);
@@ -178,6 +199,38 @@ MStatus VSAMesher::buildNewFacesList(
 	}
 	numPolygons = polygonCounts.length();
 	return MS::kSuccess;
+}
+
+MStatus VSAMesher::addHoles(MFnMesh & meshFn, Map<VertexIndex, VertexIndex>& newIndices, MFloatPointArray & newVertices)
+{
+	MStatus status;
+	FaceIndex simplifiedFaceIndex = 0;
+	// Iteration proxies, see if they have more than one border rings
+	for (auto &p : proxyList)
+	{
+		if (false == p.valid) continue;
+		if (p.borderRings.size() > 1)
+		{
+			MPointArray holeVertices;
+			MIntArray holeDegrees;
+
+			for (auto it = ++p.borderRings.begin(); it != p.borderRings.end(); it++)
+			{
+				int degree = 0;
+				for (auto &h : it->anchors)
+				{
+					MFloatPoint vertexPos = newVertices[newIndices[h.vertex()]];
+					holeVertices.append(vertexPos);
+					degree++;
+				}
+				holeDegrees.append(degree);
+			}
+			status = meshFn.addHoles(simplifiedFaceIndex, holeVertices, holeDegrees);
+			MCheckStatus(status, "failed to add holes to polygon");
+		}
+		simplifiedFaceIndex++;
+	}
+	return status;
 }
 
 void VSAMesher::newAnchor(VertexIndex vertex)
@@ -195,8 +248,11 @@ void VSAMesher::newAnchor(VertexIndex vertex)
 	for (int i = 0; i < (int) connectedVertices.length(); i++)
 	{
 		HalfEdge he(context, vertex, connectedVertices[i]);
-		if (he.isBoundary()) continue;
 		ProxyLabel l = he.faceLabel(faceList);
+		if (l < 0 || false == proxyList[l].isBorder(context, faceList, he))
+		{
+			continue;
+		}
 		if (finishedLabels.find(l) == finishedLabels.end())
 		{
 			proxyList[l].addAnchor(context, faceList, he);

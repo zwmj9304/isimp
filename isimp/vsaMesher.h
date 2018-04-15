@@ -39,8 +39,9 @@ public:
 							  MIntArray &polygonConnects,
 							  int &numPolygons);
 
-	static int m_counter[10];
-	static double m_time[10];
+	MStatus addHoles(MFnMesh &meshFn, 
+		Map<VertexIndex, VertexIndex> &newIndices,
+		MFloatPointArray &newVertices);
 
 private:
 	MObject &meshObj;

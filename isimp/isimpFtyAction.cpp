@@ -178,9 +178,23 @@ MStatus isimpFty::doMeshing()
 	// this method will fail as the node will continue to get its geometry from 
 	// its history connection.
 	// To use this method you must first break the history connection.
+
+	int parentCount = meshFn.parentCount(&status);
+
 	status = meshFn.createInPlace(numVertices, numPolygons, newVertices, polygonCounts, polygonConnects);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
-	status = meshFn.updateSurface();
+
+	//MObject object = meshFn.create(numVertices, numPolygons, newVertices, polygonCounts, polygonConnects, MObject::kNullObj, &status);
+	//CHECK_MSTATUS_AND_RETURN_IT(status)
+	//
+	//status = mesher.addHoles(meshFn, newIndices, newVertices);
+	//CHECK_MSTATUS_AND_RETURN_IT(status);
+
+	//MString ccName = meshFn.currentColorSetName(&status);
+	//CHECK_MSTATUS_AND_RETURN_IT(status);
+
+	//status = meshFn.clearColors(&ccName);
+	//CHECK_MSTATUS_AND_RETURN_IT(status);
 
 	timer.endTimer();
 	cout << "[iSimp] Meshing Time         " << timer.elapsedTime() << "s" << endl;

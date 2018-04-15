@@ -46,6 +46,9 @@ public:
 	VertexIndex vertex() const;
 	ProxyLabel	faceLabel(Array<VSAFace> &faceList) const;
 
+	VertexIndex	beginVertex() const;
+	VertexIndex	endVertex() const;
+
 	bool isBoundary() const;
 	bool isValid() const;
 
@@ -79,9 +82,17 @@ public:
 	//
 	HalfEdge borderHalfEdge;
 	Size borderEdgeCount;
-	List<VertexIndex> anchors; ///< anchors must be sorted by the same order of halfedge
+	List<HalfEdge> anchors; ///< anchors must be sorted by the same order of halfedge
 };
 
+struct HalfEdgeHasher
+{
+	std::size_t operator()(const HalfEdge& h) const
+	{
+		return (31 * std::hash<int>()(h.beginVertex()) +
+					 std::hash<int>()(h.endVertex()));
+	}
+};
 
 class Proxy {
 public:
@@ -92,8 +103,8 @@ public:
 		this->seed = -1;
 		this->normal = Vector3D::zero;
 		this->centroid = Point3D::origin;
-		this->borderEdgeCount = -1;
-		this->borderHalfEdge = HalfEdge();
+		//this->borderEdgeCount = -1;
+		//this->borderHalfEdge = HalfEdge();
 	}
 	Proxy(ProxyLabel label)
 	{ 
@@ -102,8 +113,8 @@ public:
 		this->seed = -1;
 		this->normal = Vector3D::zero;
 		this->centroid = Point3D::origin;
-		this->borderHalfEdge = HalfEdge();
-		this->borderEdgeCount = -1;
+		//this->borderHalfEdge = HalfEdge();
+		//this->borderEdgeCount = -1;
 	}
 
 	Proxy& operator=(const Proxy &other);
@@ -122,9 +133,9 @@ public:
 
 	ProxyLabel label;
 
-	HalfEdge borderHalfEdge;
-	Size borderEdgeCount;
-	List<HalfEdge> anchors;
+	//HalfEdge borderHalfEdge;
+	//Size borderEdgeCount;
+	//List<HalfEdge> anchors;
 
 	// Used by meshing routines, each ring reprensents a one closed boundary
 	// Holes in polygons are supported in this way
@@ -133,8 +144,8 @@ public:
 	// The first border ring in the list indicates the outer border of this polygon
 	// The remaining rings are essentially holes in this polygon
 	//
-	//List<BorderRing> borderRings;
-	//Set<HalfEdge> borderHalfEdges;
+	List<BorderRing> borderRings;
+	Set<HalfEdge, HalfEdgeHasher> borderHalfEdges;
 
 	// For a given border halfedge on this proxy, find the next halfedge on border
 	HalfEdge nextHalfEdgeOnBorder(MeshingContext &context, Array<VSAFace> &faceList, const HalfEdge &he);
@@ -151,7 +162,7 @@ public:
 
 	// Add a new border ring to this proxy
 	// The return value indicates whether addRing succeeded
-	bool addRing(HalfEdge borderHalfEdge);
+	bool addRing(MeshingContext &context, Array<VSAFace> &faceList, HalfEdge borderHalfEdge);
 };
 
 

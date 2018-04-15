@@ -141,31 +141,22 @@ HalfEdge HalfEdge::twin() const
 	return HalfEdge(ctx, end, begin);
 }
 
-int VSAMesher::m_counter[10];
-double VSAMesher::m_time[10];
-
 FaceIndex HalfEdge::face() const
 {
-	MTimer timer;
 	MStatus status;
 	MIntArray faceList;
 	int prevIdx;
 
-	timer.beginTimer();
 	status = ctx->vertexIter.setIndex(begin, prevIdx);
 	status = ctx->vertexIter.getConnectedFaces(faceList);
-	timer.endTimer();  VSAMesher::m_counter[2]++; VSAMesher::m_time[2] += timer.elapsedTime();
 
 
 	for (FaceIndex i = 0; i < (int) faceList.length(); i++)
 	{
-		timer.beginTimer();
 		MIntArray faceVertices;
 		status = ctx->meshFn.getPolygonVertices(faceList[i], faceVertices);
 		int degree = faceVertices.length();
-		timer.endTimer();  VSAMesher::m_counter[3]++; VSAMesher::m_time[3] += timer.elapsedTime();
 
-		timer.beginTimer();
 		for (VertexIndex v = 0; v < degree; v++)
 		{
 			if (faceVertices[v]					== begin &&
@@ -174,7 +165,6 @@ FaceIndex HalfEdge::face() const
 				return faceList[i];
 			}
 		}
-		timer.endTimer();  VSAMesher::m_counter[4]++; VSAMesher::m_time[4] += timer.elapsedTime();
 	}
 	// This means this halfedge is an border edge
 	//
@@ -215,6 +205,16 @@ ProxyLabel HalfEdge::faceLabel(Array<VSAFace> &faceList) const
 	return faceList[f].label;
 }
 
+VertexIndex HalfEdge::beginVertex() const
+{
+	return this->begin;
+}
+
+VertexIndex HalfEdge::endVertex() const
+{
+	return this->end;
+}
+
 
 bool HalfEdge::isBoundary() const
 {
@@ -251,11 +251,11 @@ Proxy & Proxy::operator=(const Proxy & other)
 	this->valid		= other.valid;
 	this->normal	= other.normal;
 	this->centroid	= other.centroid;
-	this->borderHalfEdge	= other.borderHalfEdge;
-	this->anchors			= other.anchors;
-	this->borderEdgeCount	= other.borderEdgeCount;
-	//this->borderRings = other.borderRings;
-	//this->borderHalfEdges = other.borderHalfEdges;
+	//this->borderHalfEdge	= other.borderHalfEdge;
+	//this->anchors			= other.anchors;
+	//this->borderEdgeCount	= other.borderEdgeCount;
+	this->borderRings = other.borderRings;
+	this->borderHalfEdges = other.borderHalfEdges;
 	return *this;
 }
 
@@ -266,7 +266,10 @@ HalfEdge Proxy::nextHalfEdgeOnBorder(MeshingContext &context, Array<VSAFace> &fa
 	//if (isBorder(context, faceList, nextHe)) return nextHe;
 	//return findHalfEdgeOnBorder(context, faceList, nextHe.vertex());
 
-	if (false == isBorder(context, faceList, he)) return HalfEdge();
+	if (false == isBorder(context, faceList, he))
+	{
+		return HalfEdge();
+	}
 	// Assuming counter-clockwise halfedge orientation
 	// Triangle to the right side SHOULD belong to a different proxy
 	//
@@ -330,29 +333,65 @@ void Proxy::addAnchor(MeshingContext &context, Array<VSAFace> &faceList, HalfEdg
 
 	// TODO duplicate anchor check??
 
-	// simple case
-	if (anchors.size() < 2) {
-		anchors.push_back(newAnchorHe);
-		return;
-	}
-
-	// more complicated case:
-	// travel along the border to find the anchor after it
-	// as in the hole case, no anchor will be added for this proxy
-	auto h = newAnchorHe;
-	do {
-		// TODO this loop is silly, can be replaced by two pointers
-		for (auto it = anchors.begin(); it != anchors.end(); it++) {
-			if (h == *it) {
-				anchors.insert(it, newAnchorHe);
-				return;
-			}
+	// iterate through all rings
+	for (auto &ring : borderRings)
+	{
+		// simple case
+		if (ring.anchors.size() < 2) {
+			ring.anchors.push_back(newAnchorHe);
+			return;
 		}
-		h = nextHalfEdgeOnBorder(context, faceList, h);
-	} while (h != newAnchorHe);
+
+		// more complicated case:
+		// travel along the border to find the anchor after it
+		// as in the hole case, no anchor will be added for this proxy
+		auto h = newAnchorHe;
+		do {
+			// TODO this loop is silly, can be replaced by two pointers
+			for (auto it = ring.anchors.begin(); it != ring.anchors.end(); it++) {
+				if (h == *it) {
+					ring.anchors.insert(it, newAnchorHe);
+					return;
+				}
+			}
+			h = nextHalfEdgeOnBorder(context, faceList, h);
+		} while (h != newAnchorHe);
+	}
 }
 
-bool Proxy::addRing(HalfEdge borderHalfEdge)
+bool Proxy::addRing(MeshingContext &context, Array<VSAFace> &faceList, HalfEdge borderHalfEdge)
 {
-	return false;
+	if (false == isBorder(context, faceList, borderHalfEdge))
+	{
+		return false;
+	}
+	int heCount = 0;
+	HalfEdge nextHe = borderHalfEdge;
+	do {
+		if (borderHalfEdges.find(nextHe) == borderHalfEdges.end())
+		{
+			heCount++;
+			borderHalfEdges.insert(nextHe);
+		}
+		else
+		{
+			return false;
+		}
+		// travel to the next halfedge
+		nextHe = nextHalfEdgeOnBorder(context, faceList, nextHe);
+	} while (nextHe != borderHalfEdge);
+
+	// Check whether this ring's heCount is larger than others,
+	// if so, insert to front, else, insert to the second position
+	BorderRing ring(borderHalfEdge, heCount);
+	auto it = borderRings.begin();
+	if (heCount > it->borderEdgeCount)
+	{
+		borderRings.insert(it, ring);
+	}
+	else
+	{
+		borderRings.insert(++it, ring);
+	}
+	return true;
 }
