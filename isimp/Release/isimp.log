@@ -3,9 +3,6 @@
   isimpFtyAction.cpp
   isimpMain.cpp
   isimpNode.cpp
-  vsa.cpp
-  vsaMesher.cpp
-  vsaProxy.cpp
   Generating Code...
      Creating library Release\isimp.lib and object Release\isimp.exp
   isimp.vcxproj -> E:\CLionProjects\iSimplify\isimp\Release\isimp.mll

@@ -277,11 +277,11 @@ MStatus isimp::initModifierNode(MObject modifierNode)
 
 	// Similarly for the numProxies, numIterations and edgeSplitThreshold
 	//
-	MObject nProxiesAttr = depNodeFn.attribute("nProxies");
+	MObject nProxiesAttr = depNodeFn.attribute("numProxies");
 	MPlug nProxiesPlug(modifierNode, nProxiesAttr);
 	status = nProxiesPlug.setValue(fNumProxies);
 
-	MObject nIterAttr = depNodeFn.attribute("nIter");
+	MObject nIterAttr = depNodeFn.attribute("numIterations");
 	MPlug nIterPlug(modifierNode, nIterAttr);
 	status = nIterPlug.setValue(fNumIterations);
 
@@ -323,27 +323,27 @@ bool isimp::parseCmdArgs(const MArgList & argList)
 	{
 		badArgument = true;
 	}
-	else if (operationTypeArgument == "init")
+	else if (operationTypeArgument == "init" || operationTypeArgument == "i")
 	{
 		fOperation = kFlood;
 	}
-	else if (operationTypeArgument == "mesh")
+	else if (operationTypeArgument == "mesh" || operationTypeArgument == "m")
 	{
 		fOperation = kGenerate;
 	}
-	else if (operationTypeArgument == "add")
+	else if (operationTypeArgument == "add" || operationTypeArgument == "a")
 	{
 		fOperation = kAddProxyBySeed;
 	}
-	else if (operationTypeArgument == "del")
+	else if (operationTypeArgument == "del" || operationTypeArgument == "d")
 	{
 		fOperation = kDeleteProxyBySeed;
 	}
-	//else if (operationTypeArgument == "paint")
-	//{
-	//	fOperation = kPaintProxyByFace;
-	//}
-	else if (operationTypeArgument == "color")
+	else if (operationTypeArgument == "color" || operationTypeArgument == "c")
+	{
+		fOperation = kPaintProxyByFace;
+	}
+	else if (operationTypeArgument == "refresh" || operationTypeArgument == "r")
 	{
 		fOperation = kRefresh;
 	}

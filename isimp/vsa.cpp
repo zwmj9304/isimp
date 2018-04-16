@@ -33,6 +33,9 @@ void VSAFlooding::init(Array<VSAFace> &faceList, Array<Proxy> &proxyList,
 
 void VSAFlooding::flood(Array<VSAFace> &faceList, Array<Proxy> &proxyList)
 {
+	// Clear first
+	clear(faceList);
+
 	// Global priority queue of faces
 	auto metricComp = [](MetricFace mf1, MetricFace mf2) {
 		return mf1.distance < mf2.distance; 

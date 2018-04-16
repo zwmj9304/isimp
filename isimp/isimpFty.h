@@ -106,6 +106,8 @@ private:
 	double	fSplitThreshold;    ///< Edge split threshold used in meshing
 	bool fKeepHoles;
 
+	MStatus runVSAIterations();
+
 	MStatus buildFaceNeighbors();
 	MStatus getFloodingResult();
 	MStatus checkOrCreateBlindDataType();

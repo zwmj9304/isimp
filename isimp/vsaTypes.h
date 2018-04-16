@@ -36,7 +36,7 @@
 #define PROXY_BLIND_DATA_ID 15206
 #define LABEL_BL_LONG_NAME "proxy_label"
 #define LABEL_BL_SHORT_NAME "pxl"
-#define SEED_BL_LONG_NAME "is_seedface"
+#define SEED_BL_LONG_NAME "seed_array"
 #define SEED_BL_SHORT_NAME "seed"
 
 #define PriorityQueue std::multiset

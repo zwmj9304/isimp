@@ -197,10 +197,10 @@ MStatus VSAMesher::buildNewFacesList(
 {
 	for (auto &p : proxyList) 
 	{
+		if (false == p.valid) continue;
 		// only use the outer ring for first step
 		auto outerRing = p.borderRings.front();
 		Size currentFaceCount = (Size)outerRing.anchors.size();
-		if (false == p.valid) continue;
 		for (auto &h : outerRing.anchors)
 		{
 			VertexIndex currentIndex = newIndices[h.vertex()];

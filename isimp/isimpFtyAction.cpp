@@ -45,27 +45,27 @@ MStatus isimpFty::doIt()
 	switch (fOperationType)
 	{
 	case kFlood: {
-		cout << "[iSimp] Command 0: Flood" << endl;
+		cout << "[iSimp] ---- Command 0: Flood" << endl;
 		status = doFlooding();
 		break; }
 	case kGenerate: {
-		cout << "[iSimp] Command 1: Generate Mesh" << endl;
+		cout << "[iSimp] ---- Command 1: Generate Mesh" << endl;
 		status = doMeshing();
 		break; }
 	case kAddProxyBySeed: {
-		cout << "[iSimp] Command 2: Add Region" << endl;
+		cout << "[iSimp] ---- Command 2: Add Region" << endl;
 		status = doAddProxy();
 		break; }
 	case kDeleteProxyBySeed: {
-		cout << "[iSimp] Command 3: Delete Region" << endl;
+		cout << "[iSimp] ---- Command 3: Delete Region" << endl;
 		status = doDelProxy();
 		break; }
-	//case kPaintProxyByFace: {
-	//  cout << "[iSimp] Command 4: Paint Region" << endl;
-	//	status = doPaintProxy();
-	//	break; }
+	case kPaintProxyByFace: {
+		cout << "[iSimp] ---- Command 4: Turn On Color Display" << endl;
+		status = doPaintProxy();
+		break; }
 	case kRefresh: {
-		cout << "[iSimp] Command 5: Turn On Color Display" << endl;
+		cout << "[iSimp] ---- Command 5: Refresh" << endl;
 		status = doReFlooding();
 		break; }
 	default:
@@ -75,7 +75,9 @@ MStatus isimpFty::doIt()
 
 	// free resources when finished
 	faceList.clear();
+	faceList.shrink_to_fit();
 	proxyList.clear();
+	proxyList.shrink_to_fit();
 
 	return status;
 }
@@ -83,14 +85,8 @@ MStatus isimpFty::doIt()
 MStatus isimpFty::doFlooding() {
 	MStatus status;
 	MTimer timer;
-	double floodTime = 0, fitTime = 0;
+
 	// Prepare mesh for Distortion Minimizing Flooding
-	//
-	MFnMesh meshFn(fMesh);
-
-	// Start Variational Shape Approximation Routine
-	//
-
 	// Build FaceNeighbors data structure
 	//
 	timer.beginTimer();
@@ -99,42 +95,13 @@ MStatus isimpFty::doFlooding() {
 	cout << "[iSimp] Build Neighbors Time " << timer.elapsedTime() << "s" << endl;
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
+	// Start Variational Shape Approximation Routine
 	// Run Distortion Minimizing Flooding on given mesh using attributes
 	// such as numProxies, numIterations, etc.
 	//
 	VSAFlooding::init(faceList, proxyList, fNumProxies);
 
-	timer.beginTimer();
-	VSAFlooding::flood(faceList, proxyList);
-	timer.endTimer(); floodTime += timer.elapsedTime();
-
-	for (int i = 1; i < fNumIterations; i++)
-	{
-		timer.beginTimer();
-		VSAFlooding::fitProxy(faceList, proxyList);
-		VSAFlooding::clear(faceList);
-		timer.endTimer(); fitTime += timer.elapsedTime();
-		
-		timer.beginTimer();
-		VSAFlooding::flood(faceList, proxyList);
-		timer.endTimer();
-		timer.endTimer(); floodTime += timer.elapsedTime();
-	}
-
-	cout << "[iSimp] Flooding Time:  " << floodTime << "s" << endl;
-	cout << "[iSimp] Fit Proxy Time: " << fitTime << "s" << endl;
-
-	// Gather Proxy information and assign color to mesh faces
-	// Assign proxy label to faces too, using BlindData
-	// Need to save ProxyList data structure for future use (probably as a 
-	// complex node attribute)
-	//
-	timer.beginTimer();
-	status = getFloodingResult();
-	timer.endTimer();
-	cout << "[iSimp] Get Result Time " << timer.elapsedTime() << "s" << endl;
-	CHECK_MSTATUS_AND_RETURN_IT(status);
-
+	status = runVSAIterations();
 	return status;
 }
 
@@ -196,22 +163,15 @@ MStatus isimpFty::doAddProxy()
 	status = rebuildLists();
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
-	// Next, build face neighbors for flooding
-	status = buildFaceNeighbors();
-	CHECK_MSTATUS_AND_RETURN_IT(status);
-
-	// Get the proxy label of selected face
+	// Next, Get the proxy label of selected face
 	if (fComponentIDs.length() == 0)
 	{
 		// should not happen
 		ErrorReturn("No face selected");
 	}
 	MFnMesh meshFn(fMesh);
-	ProxyLabel label;
 	FaceIndex f = fComponentIDs[0];
-	status = meshFn.getIntBlindData(f, MFn::kMeshPolygonComponent,
-		PROXY_BLIND_DATA_ID, LABEL_BL_SHORT_NAME, label);
-	MCheckStatus(status, "getting region information");
+	ProxyLabel label = faceList[f].label;
 
 	if (proxyList[label].seed == f) {
 		// TODO find around neighbouring faces for a non-seed face
@@ -243,10 +203,6 @@ MStatus isimpFty::doDelProxy()
 	status = rebuildLists();
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
-	// Next, build face neighbors for flooding
-	status = buildFaceNeighbors();
-	CHECK_MSTATUS_AND_RETURN_IT(status);
-
 	// Get the proxy label of selected face
 	if (fComponentIDs.length() == 0)
 	{
@@ -254,11 +210,8 @@ MStatus isimpFty::doDelProxy()
 		ErrorReturn("No face selected");
 	}
 	MFnMesh meshFn(fMesh);
-	ProxyLabel label;
 	FaceIndex f = fComponentIDs[0];
-	status = meshFn.getIntBlindData(f, MFn::kMeshPolygonComponent,
-		PROXY_BLIND_DATA_ID, LABEL_BL_SHORT_NAME, label);
-	MCheckStatus(status, "getting region information");
+	ProxyLabel label = faceList[f].label;
 
 	// Do the actual deletion
 	proxyList[label].valid = false;
@@ -273,64 +226,58 @@ MStatus isimpFty::doDelProxy()
 
 MStatus isimpFty::doPaintProxy()
 {
-	// Temporary used for performance test
-	MStatus status;
-
-	MFnMesh meshFn(fMesh);
-	MItMeshPolygon faceIter(fMesh);
-	MItMeshVertex vertexIter(fMesh);
-	MItMeshEdge edgeIter(fMesh);
-	MIntArray intArray;
-	int numCalls = 0;
-	MTimer timer;
-	timer.beginTimer();
-	for (int i = 0; i < 10; i++)
-	{
-		for (faceIter.reset(); !faceIter.isDone(); faceIter.next())
-		{
-			status = faceIter.getConnectedFaces(intArray);
-			numCalls++;
-		}
-	}
-	timer.endTimer();
-	double faceTime = timer.elapsedTime();
-	cout << numCalls << " f-f connection calls " << faceTime << "s" << endl;
-
-	numCalls = 0;
-	timer.beginTimer();
-	for (int i = 0; i < 10; i++)
-	{
-		for (vertexIter.reset(); !vertexIter.isDone(); vertexIter.next())
-		{
-			status = vertexIter.getConnectedFaces(intArray);
-			numCalls++;
-		}
-	}
-	timer.endTimer();
-	double vertTime = timer.elapsedTime();
-	cout << numCalls << " v-f connection calls " << vertTime << "s" << endl;
-
-	numCalls = 0;
-	timer.beginTimer();
-	for (int i = 0; i < 10; i++)
-	{
-		for (edgeIter.reset(); !edgeIter.isDone(); edgeIter.next())
-		{
-			int num = edgeIter.getConnectedFaces(intArray);
-			numCalls++;
-		}
-	}
-	timer.endTimer();
-	double edgeTime = timer.elapsedTime();
-	cout << numCalls << " e-f connection calls " << edgeTime << "s" << endl;
-
-	return status;
+	// Use this command to turn on color display in undo cases
+	return MS::kSuccess;
 }
 
 MStatus isimpFty::doReFlooding()
 {
-	// Use this command to turn on color display in undo cases
-	return MS::kSuccess;
+	MStatus status;
+
+	// First, get proxy information from input mesh
+	status = rebuildLists();
+	CHECK_MSTATUS_AND_RETURN_IT(status);
+
+	status = runVSAIterations();
+	return status;
+}
+
+MStatus isimpFty::runVSAIterations()
+{
+	MStatus status;
+	MTimer timer;
+	double floodTime = 0, fitTime = 0;
+
+	timer.beginTimer();
+	VSAFlooding::flood(faceList, proxyList);
+	timer.endTimer(); floodTime += timer.elapsedTime();
+
+	for (int i = 1; i < fNumIterations; i++)
+	{
+		timer.beginTimer();
+		VSAFlooding::fitProxy(faceList, proxyList);
+		timer.endTimer(); fitTime += timer.elapsedTime();
+
+		timer.beginTimer();
+		VSAFlooding::flood(faceList, proxyList);
+		timer.endTimer();
+		timer.endTimer(); floodTime += timer.elapsedTime();
+	}
+
+	cout << "[iSimp] Flooding Time:  " << floodTime << "s" << endl;
+	cout << "[iSimp] Fit Proxy Time: " << fitTime << "s" << endl;
+
+	// Gather Proxy information and assign color to mesh faces
+	// Assign proxy label to faces too, using BlindData
+	// Need to save ProxyList data structure for future use (probably as a 
+	// complex node attribute)
+	//
+	timer.beginTimer();
+	status = getFloodingResult();
+	timer.endTimer();
+	cout << "[iSimp] Get Result Time " << timer.elapsedTime() << "s" << endl;
+
+	return status;
 }
 
 MStatus isimpFty::buildFaceNeighbors()
@@ -377,13 +324,28 @@ MStatus isimpFty::getFloodingResult()
 		auto newColor = faceList[i].getColorByLabel();
 		status = meshFn.setFaceColor(newColor, i);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
-
-		// Assign proxy label to faces too, using BlindData
-		ProxyLabel label = faceList[i].label;
-		status = meshFn.setIntBlindData(i, MFn::kMeshPolygonComponent, 
-			PROXY_BLIND_DATA_ID, LABEL_BL_SHORT_NAME, label);
-		CHECK_MSTATUS_AND_RETURN_IT(status);
 	}
+
+	// Encode proxy list as binary string
+	Array<FaceIndex> seedArray(fNumProxies);
+	for (ProxyLabel p = 0; p < fNumProxies; p++)
+	{
+		if (proxyList[p].valid)
+			seedArray[p] = proxyList[p].seed;
+		else
+			seedArray[p] = -1;
+	}
+	// Use the Polygon at index 0 to store all proxy information
+	MString binaryData((char *) &seedArray[0], 4 * fNumProxies);
+	//if (meshFn.hasBlindDataComponentId(0, MFn::kMeshPolygonComponent, PROXY_BLIND_DATA_ID))
+	//{
+	//	status = meshFn.clearBlindData(0, MFn::kMeshPolygonComponent, PROXY_BLIND_DATA_ID);
+	//	MCheckStatus(status, "cannot clear previous proxy data");
+	//}
+	status = meshFn.setBinaryBlindData(0, MFn::kMeshPolygonComponent,
+		PROXY_BLIND_DATA_ID, SEED_BL_SHORT_NAME, binaryData);
+	MCheckStatus(status, "cannot output proxy data");
+
 	return MS::kSuccess;
 }
 
@@ -399,9 +361,9 @@ MStatus isimpFty::checkOrCreateBlindDataType()
 	{
 		MStringArray longNames, shortNames, formatNames;
 
-		longNames.append(LABEL_BL_LONG_NAME);
-		shortNames.append(LABEL_BL_SHORT_NAME);
-		formatNames.append("int");
+		longNames.append(SEED_BL_LONG_NAME);
+		shortNames.append(SEED_BL_SHORT_NAME);
+		formatNames.append("binary");
 
 		status = meshFn.createBlindDataType(
 			PROXY_BLIND_DATA_ID, longNames, shortNames, formatNames);
@@ -418,64 +380,37 @@ MStatus isimpFty::rebuildLists()
 	MStatus status;
 	MFnMesh meshFn(fMesh);
 	MItMeshPolygon faceIter(fMesh);
-	MIntArray polygonIDs, proxyLabels;
 
-	status = meshFn.getIntBlindData(MFn::kMeshPolygonComponent,
-		PROXY_BLIND_DATA_ID, LABEL_BL_SHORT_NAME, polygonIDs, proxyLabels);
-	MCheckStatus(status, "getting proxy information failed");
-	if (polygonIDs.length() != meshFn.numPolygons())
+	status = buildFaceNeighbors();
+	MCheckStatus(status, "failed to rebuild face neighbors");
+
+	// Use the Polygon at index 0 to store all proxy information
+	MString seedArrayBinary;
+	status = meshFn.getBinaryBlindData(0, MFn::kMeshPolygonComponent,
+		PROXY_BLIND_DATA_ID, SEED_BL_SHORT_NAME, seedArrayBinary);
+	MCheckStatus(status, "proxy information not initialized");
+
+	int numProxies;
+	int *seedArray = (int *)seedArrayBinary.asChar(numProxies);
+	numProxies /= 4; // int is four bytes, char is one byte
+
+	if (numProxies <= 0)
 	{
-		ErrorReturn("not all faces were assigned proxy information");
+		ErrorReturn("zero proxy is found");
 	}
 
-	int highestLabel = -1;
-	int numFaces = meshFn.numPolygons();
-	int prev;
-	faceList.clear();
-	faceList.resize(numFaces);
-
-	// Build a map to record all seed faces
-	//
-	Map<ProxyLabel, FaceIndex> labelMap;
-
-	for (int id = 0; id < numFaces; id++)
-	{
-		FaceIndex i = polygonIDs[id];
-		ProxyLabel label = proxyLabels[id];
-		status = faceIter.setIndex(i, prev);
-		MCheckStatus(status, "non-contiguous polygon indexing");
-
-		highestLabel = label > highestLabel ? label : highestLabel;
-		// rebuild faceList with label information
-		VSAFace face(label);
-		status = VSAFace::build(face, faceIter, i);
-		CHECK_MSTATUS_AND_RETURN_IT(status);
-		faceList[i] = face;
-
-		if (label >= 0 && labelMap.find(label) == labelMap.end())
-		{
-			labelMap.insert(newEntry(label, i));
-		}
-	}
-
-	if (labelMap.size() == 0)
-	{
-		ErrorReturn("proxy information not initialized");
-	}
-
-	fNumProxies = highestLabel + 1;
+	fNumProxies = numProxies;
 	proxyList.clear();
 
 	for (ProxyLabel l = 0; l < fNumProxies; l++)
 	{
 		Proxy newProxy(l);
-		auto labelEntry = labelMap.find(l);
-		if (labelEntry != labelMap.end())
+		FaceIndex seedFace = seedArray[l];
+		if (seedFace >= 0)
 		{
-			FaceIndex seedFace = labelEntry->second;
 			FaceIndex prev;
 			faceIter.setIndex(seedFace, prev);
-			newProxy.seed = labelEntry->second;
+			newProxy.seed = seedFace;
 			newProxy.centroid = faceIter.center();
 			faceIter.getNormal(newProxy.normal);
 		}
@@ -487,7 +422,8 @@ MStatus isimpFty::rebuildLists()
 	}
 	
 	// Recalculate normal, centroid and seed for each proxy
-	VSAFlooding::fitProxy(faceList, proxyList);
+	VSAFlooding::flood(faceList, proxyList);
+	// VSAFlooding::fitProxy(faceList, proxyList);
 
 	timer.endTimer();
 	cout << "[iSimp] Rebuild Lists Time   " << timer.elapsedTime() << "s" << endl;
