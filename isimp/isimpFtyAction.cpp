@@ -156,9 +156,9 @@ MStatus isimpFty::doMeshing()
 
 	VSAMesher mesher(fMesh, proxyList, faceList, meshFn, faceIt, edgeIt, vertIt);
 	// First run VSA routines to find anchor vertices
-	status = mesher.initAnchors();
+	status = mesher.initAnchors(fKeepHoles);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
-	status = mesher.refineAnchors(edgeSplitThreshold);
+	status = mesher.refineAnchors(fKeepHoles, fSplitThreshold);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
 	// Create the new mesh
@@ -173,28 +173,15 @@ MStatus isimpFty::doMeshing()
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 	status = mesher.buildNewFacesList(newIndices, polygonCounts, polygonConnects, numPolygons);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
-	// Note:
-	// If the functionset is operating on a mesh node with construction history, 
-	// this method will fail as the node will continue to get its geometry from 
-	// its history connection.
-	// To use this method you must first break the history connection.
 
-	int parentCount = meshFn.parentCount(&status);
-
-	status = meshFn.createInPlace(numVertices, numPolygons, newVertices, polygonCounts, polygonConnects);
+	MObject newMeshGeom = meshFn.create(numVertices, numPolygons, newVertices, polygonCounts, polygonConnects, fMesh, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
-
-	//MObject object = meshFn.create(numVertices, numPolygons, newVertices, polygonCounts, polygonConnects, MObject::kNullObj, &status);
-	//CHECK_MSTATUS_AND_RETURN_IT(status)
-	//
-	//status = mesher.addHoles(meshFn, newIndices, newVertices);
-	//CHECK_MSTATUS_AND_RETURN_IT(status);
-
-	//MString ccName = meshFn.currentColorSetName(&status);
-	//CHECK_MSTATUS_AND_RETURN_IT(status);
-
-	//status = meshFn.clearColors(&ccName);
-	//CHECK_MSTATUS_AND_RETURN_IT(status);
+	
+	if (fKeepHoles)
+	{
+		status = mesher.addHoles(meshFn, newIndices, newVertices);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+	}
 
 	timer.endTimer();
 	cout << "[iSimp] Meshing Time         " << timer.elapsedTime() << "s" << endl;
@@ -505,5 +492,20 @@ MStatus isimpFty::rebuildLists()
 	timer.endTimer();
 	cout << "[iSimp] Rebuild Lists Time   " << timer.elapsedTime() << "s" << endl;
 
+	return status;
+}
+
+MStatus isimpFty::clearVSAData(MFnMesh & meshFn)
+{
+	MStatus status;
+	MIntArray faceList;
+	int numFaces = meshFn.numPolygons();
+	
+	for (int i = 0; i < numFaces; i++)
+	{
+		faceList.append(i);
+	}
+
+	status = meshFn.removeFaceColors(faceList);
 	return status;
 }

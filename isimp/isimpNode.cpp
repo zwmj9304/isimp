@@ -39,6 +39,7 @@ MObject     isimpNode::opType;
 MObject		isimpNode::nProxies;
 MObject		isimpNode::nIter;
 MObject		isimpNode::eThres;
+MObject		isimpNode::kHoles;
 
 
 isimpNode::isimpNode()
@@ -116,6 +117,9 @@ MStatus isimpNode::compute(const MPlug& plug, MDataBlock& data)
 			MDataHandle eThresData = data.inputValue(eThres, &status);
 			MCheckStatus(status, "ERROR getting eThres");
 
+			MDataHandle kHolesData = data.inputValue(kHoles, &status);
+			MCheckStatus(status, "ERROR getting kHoles");
+
 			// Copy the inMesh to the outMesh, so you can
 			// perform operations directly on outMesh
 			//
@@ -155,6 +159,7 @@ MStatus isimpNode::compute(const MPlug& plug, MDataBlock& data)
 			Size numProxies = nProxData.asInt();
 			Size numIterations = nIterData.asInt();
 			double edgeSplitThreshold = eThresData.asDouble();
+			bool keepHoles = (0 != kHolesData.asShort());
 
 			// Set the mesh object and component List on the factory
 			//
@@ -162,7 +167,8 @@ MStatus isimpNode::compute(const MPlug& plug, MDataBlock& data)
 			fmeshOpFactory.setComponentList(compList);
 			fmeshOpFactory.setComponentIDs(cpIds);
 			fmeshOpFactory.setMeshOperation(operationType);
-			fmeshOpFactory.setVSAParams(numProxies, numIterations, edgeSplitThreshold);
+			fmeshOpFactory.setVSAParams(numProxies, numIterations, edgeSplitThreshold, keepHoles);
+			
 			// Now, perform the meshOp
 			//
 			status = fmeshOpFactory.doIt();
@@ -212,6 +218,7 @@ MStatus isimpNode::initialize()
 	MFnNumericAttribute numIterFn;
 	MFnNumericAttribute numProxyFn;
 	MFnNumericAttribute eThresFn;
+	MFnEnumAttribute kHolesFn;
 
 	cpList = attrFn.create("inputComponents", "ics",
 		MFnComponentListData::kComponentList);
@@ -237,14 +244,20 @@ MStatus isimpNode::initialize()
 	attrFn.setStorable(false);
 	attrFn.setWritable(false);
 
-	nProxies = numProxyFn.create("nProxies", "npx", MFnNumericData::kInt, 6);
+	nProxies = numProxyFn.create("numProxies", "npx", MFnNumericData::kInt, 6);
 	numProxyFn.setStorable(true);	// To be stored during file-save
 
-	nIter = numIterFn.create("nIter", "nit", MFnNumericData::kInt, 10);
+	nIter = numIterFn.create("numIterations", "nit", MFnNumericData::kInt, 20);
 	numIterFn.setStorable(true);	// To be stored during file-save
 
-	eThres = eThresFn.create("eThres", "eth", MFnNumericData::kDouble, 1.0);
+	eThres = eThresFn.create("egdeThreshold", "eth", MFnNumericData::kDouble, 1.0);
 	eThresFn.setStorable(true);	// To be stored during file-save
+
+	kHoles = kHolesFn.create("keepHoles", "khol", 0, &status);
+	kHolesFn.addField("No", 0);
+	kHolesFn.addField("Yes", 1);
+	eThresFn.setStorable(true);	// To be stored during file-save
+
 
 	// Add the attributes we have created to the node
 	//
@@ -273,6 +286,12 @@ MStatus isimpNode::initialize()
 		return status;
 	}
 	status = addAttribute(eThres);
+	if (!status)
+	{
+		status.perror("addAttribute");
+		return status;
+	}
+	status = addAttribute(kHoles);
 	if (!status)
 	{
 		status.perror("addAttribute");
@@ -331,6 +350,13 @@ MStatus isimpNode::initialize()
 	}
 
 	status = attributeAffects(eThres, outMesh);
+	if (!status)
+	{
+		status.perror("attributeAffects");
+		return status;
+	}
+
+	status = attributeAffects(kHoles, outMesh);
 	if (!status)
 	{
 		status.perror("attributeAffects");

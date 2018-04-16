@@ -17,7 +17,7 @@
 #include "maya/MFloatPointArray.h"
 #include "maya/MPointArray.h"
 
-MStatus VSAMesher::initAnchors()
+MStatus VSAMesher::initAnchors(bool keepHoles)
 {
 	MStatus status;
 	int numVertices = context.meshFn.numVertices();
@@ -93,12 +93,16 @@ MStatus VSAMesher::initAnchors()
 			{
 				ErrorReturn("Inconsistent borderEdgeCount");
 			}
+
+			// Don't add anchors to rings that represents holes if
+			// keepHoles is set to false
+			if (false == keepHoles) break;
 		}
 	}
 	return MS::kSuccess;
 }
 
-MStatus VSAMesher::refineAnchors(double threshold)
+MStatus VSAMesher::refineAnchors(bool keepHoles, double threshold)
 {
 	MStatus status;
 	// first make sure every proxy has 3 or more anchors
@@ -127,6 +131,10 @@ MStatus VSAMesher::refineAnchors(double threshold)
 				auto anchorHe = ring.anchors.front();
 				splitEdge(p, anchorHe, ring.anchors.back(), -1.0);
 			}
+
+			// Don't refine anchors to rings that represents holes if
+			// keepHoles is set to false
+			if (false == keepHoles) break;
 		}
 	} // end for loop
 
@@ -145,6 +153,9 @@ MStatus VSAMesher::refineAnchors(double threshold)
 				prev = next;
 				next++;
 			}
+			// Don't split edges to rings that represents holes if
+			// keepHoles is set to false
+			if (false == keepHoles) break;
 		}
 	}
 	return MS::kSuccess;

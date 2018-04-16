@@ -35,6 +35,7 @@ public:
 	static	MObject		nProxies;
 	static	MObject		nIter;
 	static	MObject		eThres;
+	static	MObject		kHoles;
 
 	// The typeid is a unique 32bit indentifier that describes this node.
 	// It is used to save and retrieve nodes of this type from the binary

@@ -64,7 +64,7 @@ public:
 	void		setComponentList(MObject& componentList);
 	void		setComponentIDs(MIntArray& componentIDs);
 	void		setMeshOperation(MeshOperation operationType);
-	void		setVSAParams(int numProxies, int numIterations, double edgeSplitThres);
+	void		setVSAParams(int numProxies, int numIterations, double edgeSplitThres, bool keepHoles);
 
 	// Returns the type of component expected by a given mesh operation
 	//
@@ -103,12 +103,14 @@ private:
 	//
 	int	fNumProxies;			///< The number of proxies
 	int	fNumIterations;			///< The maximum number of iterations
-	double	edgeSplitThreshold; ///< Edge split threshold used in meshing
+	double	fSplitThreshold;    ///< Edge split threshold used in meshing
+	bool fKeepHoles;
 
 	MStatus buildFaceNeighbors();
 	MStatus getFloodingResult();
 	MStatus checkOrCreateBlindDataType();
 	MStatus rebuildLists();
+	MStatus clearVSAData(MFnMesh &meshFn);
 };
 
 #endif

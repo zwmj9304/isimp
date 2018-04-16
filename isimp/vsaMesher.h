@@ -28,8 +28,8 @@ public:
 		context(mesh)
 	{}
 
-	MStatus initAnchors();
-	MStatus refineAnchors(double threshold = 2.0);
+	MStatus initAnchors(bool keepHoles = false);
+	MStatus refineAnchors(bool keepHoles = false, double threshold = 2.0);
 
 	MStatus buildNewVerticesList(Map<VertexIndex, VertexIndex> &newIndices, 
 								 MFloatPointArray &newVertices,
