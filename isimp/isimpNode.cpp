@@ -232,7 +232,7 @@ MStatus isimpNode::initialize()
 	enumFn.addField("paint", 4);
 	enumFn.addField("color", 5);
 	enumFn.setHidden(false);
-	enumFn.setWritable(false);
+	enumFn.setWritable(true);
 	enumFn.setStorable(true);	// To be stored during file-save
 
 	inMesh = attrFn.create("inMesh", "im", MFnMeshData::kMesh);

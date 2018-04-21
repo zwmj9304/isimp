@@ -376,7 +376,7 @@ bool isimp::parseCmdArgs(const MArgList & argList)
 	}
 	else
 	{
-		fNumIterations = 10;
+		fNumIterations = 16;
 	}
 	// badArgument = true;
 
